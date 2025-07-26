@@ -1,0 +1,27 @@
+[
+  {
+    "id": 1,
+    "name": "Alex Johnson",
+    "lastMessage": "Hey there!",
+    "messages": [
+      { "sender": "them", "text": "Hey there!" },
+      { "sender": "me", "text": "Hi Alex!" }
+    ]
+  },
+  {
+    "id": 2,
+    "name": "Jamie Smith",
+    "lastMessage": "Looking forward to our match!",
+    "messages": [
+      { "sender": "them", "text": "Looking forward to our match!" }
+    ]
+  },
+  {
+    "id": 3,
+    "name": "Taylor William",
+    "lastMessage": "Can we talk about cleaning schedule?",
+    "messages": [
+      { "sender": "them", "text": "Can we talk about cleaning schedule?" }
+    ]
+  }
+]
