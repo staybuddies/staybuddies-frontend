@@ -1,5 +1,58 @@
-# Vue 3 + Vite
+# 🏠 Roommate Finder App
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+A full-stack roommate matching platform built with **Spring Boot** (Java) for the backend and **Vue.js** for the frontend. The system allows students to register,
+log in, complete lifestyle quizzes, and find compatible roommates based on behavior and preferences.
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+---
+
+## 📌 Features
+
+### ✅ General
+- Responsive Vue.js frontend and Spring Boot backend
+- RESTful API architecture with secure endpoints
+- Clean modular structure for scalability
+
+### 👤 User Functionality
+- Student signup & login
+- JWT-based authentication for frontend
+- Lifestyle quiz for roommate compatibility
+- Match recommendation system
+- Profile creation and editing
+- Image upload with AWS S3
+
+### 🔐 Admin Functionality
+- Admin login (Thymeleaf UI)
+- Role-based access control (Spring Security)
+- User management: view, edit, delete students
+- Match overview and approvals (optional)
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer       | Technology                         |
+|------------|-------------------------------------|
+| Frontend   | Vue.js, Vue Router, Axios, Bootstrap/Tailwind |
+| Backend    | Spring Boot, Spring Security, JWT   |
+| Database   | PostgreSQL                          |
+| File Upload| AWS S3 Bucket                       |
+| Build Tool | Maven                               |
+| Auth       | Spring Security (JWT & Session-based) |
+| UI (Admin) | Thymeleaf                           |
+
+---
+
+## 🗂️ Project Structure
+
+### Backend (`/backend`)
+- `controller/` — REST APIs
+- `service/` — business logic
+- `repository/` — JPA repositories
+- `model/` — JPA entities
+- `config/` — security & CORS config
+
+### Frontend (`/frontend`)
+- `src/views/` — Login, Quiz, Match List, Profile
+- `src/components/` — UI components
+- `src/router/` — Vue Router setup
+- `src/services/` — API communication with backend
