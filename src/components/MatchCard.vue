@@ -1,155 +1,155 @@
 <template>
-  <div class="match-card">
-    <div class="header">
+  <article class="card">
+    <div class="row">
       <div class="avatar">{{ initial }}</div>
-      <div>
-        <strong>{{ name }}</strong>
-        <p>{{ age }} • {{ gender }} • {{ location }}</p>
+
+      <div class="meta">
+        <h3>{{ match.name }}</h3>
+        <p class="sub">
+          <span v-if="match.age">{{ match.age }} • </span>
+          <span v-if="match.gender">{{ match.gender }} • </span>
+          <span v-if="match.location">{{ match.location }}</span>
+        </p>
       </div>
-      <span class="percent">{{ compatibility }}%</span>
-    </div>
-    <div class="content">
-      <p class="label">Compatibility</p>
-      <div class="progress-bar">
-        <div class="progress" :style="{ width: compatibility + '%' }"></div>
-      </div>
-      <p class="section-title">Budget Range</p>
-      <p>{{ budget }}</p>
-      <p class="section-title">About</p>
-      <p>{{ about }}</p>
-      <p class="section-title">Lifestyle</p>
-      <div class="tags">
-        <span v-for="tag in lifestyle" :key="tag" class="tag">{{ tag }}</span>
-      </div>
-      <p class="section-title">Why You Match</p>
-      <ul>
-        <li v-for="reason in reasons" :key="reason">{{ reason }}</li>
-      </ul>
-      <div class="buttons">
-        <button class="btn-secondary">View Profile</button>
-        <button class="btn-primary">{{ actionLabel }}</button>
+
+      <div class="compat">
+        <div class="score">{{ match.compatibility }}%</div>
+        <small>compatibility</small>
       </div>
     </div>
-  </div>
+
+    <div class="actions">
+      <!-- View public profile -->
+      <router-link
+        class="btn-secondary"
+        :to="`/profile/${match.userId}`"
+        title="View profile"
+      >
+        View Profile
+      </router-link>
+
+      <!-- Status-driven actions -->
+      <template v-if="match.relationStatus === 'NONE'">
+        <button class="btn-primary" @click="$emit('send')">Send Request</button>
+      </template>
+
+      <template v-else-if="match.relationStatus === 'PENDING_SENT'">
+        <button class="btn-disabled" disabled>Request Sent</button>
+      </template>
+
+      <template v-else-if="match.relationStatus === 'PENDING_RECEIVED'">
+        <button class="btn-primary" @click="$emit('accept')">Accept</button>
+        <button class="btn-secondary" @click="$emit('decline')">Decline</button>
+      </template>
+
+      <template v-else-if="match.relationStatus === 'ACCEPTED'">
+        <button class="btn-primary" @click="goMessage">Message</button>
+      </template>
+
+      <template v-else-if="match.relationStatus === 'DECLINED'">
+        <button class="btn-disabled" disabled>Declined</button>
+      </template>
+    </div>
+  </article>
 </template>
 
-<script>
-export default {
-  name: 'MatchCard',
-  props: {
-    initial: String,
-    name: String,
-    age: Number,
-    gender: String,
-    location: String,
-    compatibility: Number,
-    budget: String,
-    about: String,
-    lifestyle: Array,
-    reasons: Array,
-    actionLabel: String
-  }
+<script setup>
+import { computed } from "vue";
+import { useRouter } from "vue-router";
+
+const props = defineProps({
+  match: { type: Object, required: true }, // { userId, name, age, gender, location, compatibility, relationStatus, requestId?, threadId? }
+});
+
+const router = useRouter();
+
+const initial = computed(() =>
+  (props.match?.name || "?").trim().charAt(0).toUpperCase()
+);
+
+function goMessage() {
+  router.push({
+    path: "/messages",
+    query: { with: String(props.match.userId) },
+  });
 }
 </script>
 
 <style scoped>
-.match-card {
-  background: #ffffff;
+.card {
+  background: #fff;
   border: 1px solid #1b9536;
-  border-radius: 8px;
-  padding: 1.5rem;
+  border-radius: 10px;
+  padding: 1rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
 }
-.header {
-  display: flex;
-  justify-content: space-between;
+.row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  margin-bottom: 1rem;
+  gap: 0.75rem;
 }
 .avatar {
-  background: #d4ff87;
-  color: #1b9536;
-  font-weight: bold;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-}
-.header strong {
+  background: #e6fff1;
   color: #1b9536;
-  display: block;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
 }
-.percent {
-  background: #d4ff87;
-  color: #1b9536;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+.meta h3 {
+  margin: 0;
+  color: #0c4a23;
+}
+.sub {
+  margin: 0.15rem 0 0;
+  color: #555;
   font-size: 0.9rem;
-  font-weight: bold;
 }
-.label {
+.compat {
+  text-align: right;
+}
+.score {
+  font-size: 1.4rem;
+  font-weight: 900;
   color: #1b9536;
-  font-weight: bold;
-  margin-bottom: 0.5rem;
 }
-.progress-bar {
-  background: #eee;
-  border-radius: 6px;
-  height: 16px;
-  overflow: hidden;
-  margin-bottom: 1rem;
-}
-.progress {
-  background: #1b9536;
-  height: 100%;
-}
-.section-title {
-  color: #1b9536;
-  font-weight: 600;
-  margin-top: 1rem;
-}
-.tags {
+.actions {
   display: flex;
-  flex-wrap: wrap;
   gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-.tag {
-  background: #e9ffe2;
-  color: #1b9536;
-  padding: 0.3rem 0.7rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-}
-ul {
-  margin: 0.5rem 0;
-  padding-left: 1.2rem;
-  color: #333;
-  font-size: 0.9rem;
-}
-.buttons {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 1rem;
+  margin-top: 0.9rem;
+  flex-wrap: wrap;
 }
 .btn-primary {
   background: #1b9536;
   color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+  border: 0;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
   cursor: pointer;
-  font-weight: bold;
+  font-weight: 700;
 }
 .btn-secondary {
   background: white;
   color: #1b9536;
   border: 2px solid #1b9536;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
   cursor: pointer;
-  font-weight: bold;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+.btn-disabled {
+  background: #d9eadf;
+  color: #398b53;
+  border: 0;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: not-allowed;
 }
 </style>

@@ -1,155 +1,177 @@
 <template>
-  <main class="chat-window" v-if="conversation">
-    <div class="chat-header">
-      <div class="avatar">{{ conversation.name.charAt(0) }}</div>
-      <div>
-        <strong>{{ conversation.name }}</strong>
-        <p>online</p>
+  <section class="chat">
+    <header class="chat-head" v-if="conversation">
+      <div class="name">{{ conversation.otherName }}</div>
+      <div class="meta">
+        <span>{{ conversation.otherGender }}</span>
+        <span v-if="conversation.otherLocation"
+          >• {{ conversation.otherLocation }}</span
+        >
       </div>
-      <div class="icons">
-        <span>⋮</span>
-      </div>
-    </div>
+    </header>
+    <header class="chat-head empty" v-else>
+      <div class="name">Messages</div>
+      <div class="meta">Select a conversation to start</div>
+    </header>
 
-    <div class="messages">
+    <main ref="scrollBox" class="messages">
       <div
-        v-for="(msg, index) in conversation.messages"
-        :key="index"
-        :class="['message', msg.sender === 'me' ? 'me' : 'them']"
+        v-for="m in conversation?.messages || []"
+        :key="m.id"
+        :class="['bubble', m.fromMe ? 'me' : 'them']"
       >
-        <div class="bubble">{{ msg.text }}</div>
-        <span v-if="msg.time" class="time">{{ msg.time }}</span>
+        <div class="text">{{ m.text ?? m.body }}</div>
+        <div class="time">{{ formatTime(m.time) }}</div>
       </div>
-    </div>
+    </main>
 
-    <div class="input-area">
-      <input v-model="newMessage" placeholder="Type..." />
-      <button @click="send">Send</button>
-    </div>
-  </main>
-  <main class="empty-chat" v-else>
-    Select a conversation to start chatting.
-  </main>
+    <footer class="composer">
+      <input
+        v-model="draft"
+        :disabled="!conversation || sending"
+        type="text"
+        placeholder="Type a message…"
+        @keydown.enter.prevent="submit"
+      />
+      <button
+        class="send"
+        :disabled="!draft.trim() || !conversation || sending"
+        @click="submit"
+      >
+        Send
+      </button>
+    </footer>
+  </section>
 </template>
 
-<script>
-export default {
-  name: "ChatWindow",
-  props: {
-    conversation: Object
-  },
-  data() {
-    return {
-      newMessage: ""
-    }
-  },
-  methods: {
-    send() {
-      if (this.newMessage.trim()) {
-        this.$emit("send", this.newMessage)
-        this.newMessage = ""
-      }
-    }
+<script setup>
+import { ref, watch, nextTick } from "vue";
+const props = defineProps({ conversation: Object, sending: Boolean });
+const emit = defineEmits(["send"]);
+const draft = ref("");
+const scrollBox = ref(null);
+
+function formatTime(t) {
+  try {
+    return new Date(t).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
   }
 }
+function scrollToBottom() {
+  nextTick(() => {
+    if (scrollBox.value)
+      scrollBox.value.scrollTop = scrollBox.value.scrollHeight;
+  });
+}
+function submit() {
+  const text = draft.value.trim();
+  if (!text || !props.conversation) return;
+  emit("send", text);
+  draft.value = "";
+  scrollToBottom();
+}
+watch(
+  () => props.conversation?.messages?.length,
+  () => scrollToBottom()
+);
+watch(
+  () => props.conversation?.id,
+  () => {
+    draft.value = "";
+    scrollToBottom();
+  }
+);
 </script>
 
 <style scoped>
-.chat-window {
-  display: flex;
-  width: 100%;
-  flex-direction: column;
+.chat {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
   height: 100%;
   background: #faffd6;
 }
-.chat-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  background: white;
-  border-bottom: 1px solid #ddd;
+.chat-head {
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
 }
-.avatar {
-  background: #d4ff87;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  color: #1b9536;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-weight: bold;
-  margin-right: 1rem;
+.chat-head .name {
+  font-weight: 900;
+  color: #0c4a23;
 }
-.chat-header strong {
-  color: #385716;
+.chat-head .meta {
+  color: #555;
+  font-size: 0.9rem;
 }
-.chat-header p {
-  margin: 0;
-  font-size: 0.8rem;
+.chat-head.empty {
+  color: #777;
 }
-.icons span {
-  margin-left: 1rem;
-  cursor: pointer;
-}
+
 .messages {
-  flex: 1;
-  padding: 1rem;
   overflow-y: auto;
-}
-.message {
-  margin-bottom: 1rem;
-  max-width: 60%;
-}
-.message.them {
-  align-self: flex-start;
-} 
-.message.me {
-  align-self: flex-end;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 .bubble {
-  background: white;
-  padding: 0.6rem;
-  border-radius: 8px;
+  max-width: 70%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 14px;
+  font-size: 0.95rem;
+  line-height: 1.25rem;
+  display: inline-flex;
+  flex-direction: column;
 }
-.message.me .bubble {
+.bubble.me {
+  align-self: flex-end;
   background: #1b9536;
   color: white;
 }
+.bubble.them {
+  align-self: flex-start;
+  background: #ffffff;
+  border: 1px solid #dfeee5;
+  color: #0c4a23;
+}
 .time {
-  font-size: 0.7rem;
-  color: #555;
-  margin-top: 0.2rem;
-  display: block;
+  opacity: 0.7;
+  font-size: 0.75rem;
+  margin-top: 0.15rem;
+  align-self: flex-end;
 }
-.input-area {
-  display: flex;
-  border-top: 1px solid #ddd;
-  padding: 1rem;
-  background: white;
-}
-.input-area input {
-  flex: 1;
+.composer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
   padding: 0.6rem;
-  border: 1px solid #1b9536;
-  border-radius: 4px;
-  margin-right: 0.5rem;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
 }
-.input-area button {
+.composer input {
+  border: 1px solid #1b9536;
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  outline: none;
+}
+.composer input:disabled {
+  background: #f3f4f6;
+}
+.send {
   background: #1b9536;
   color: white;
   border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 4px;
+  border-radius: 8px;
+  padding: 0 0.9rem;
+  font-weight: 700;
   cursor: pointer;
 }
-.empty-chat {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
-  color: #666;
+.send:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>
-

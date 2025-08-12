@@ -1,80 +1,118 @@
 <template>
-  <aside class="conversation-list">
-    <h2>Messages</h2>
-    <input type="text" placeholder="Search Conversation" class="search" />
-
-    <div
-      v-for="c in conversations"
-      :key="c.id"
-      :class="['conversation-item', { active: c.id === activeId }]"
-      @click="$emit('select', c)"
-    >
-      <div class="avatar">{{ c.name.charAt(0) }}</div>
-      <div class="details">
-        <strong>{{ c.name }}</strong>
-        <p>{{ c.lastMessage }}</p>
-      </div>
+  <aside class="list">
+    <div class="head">
+      <h3>Chats</h3>
+      <button class="reload" @click="$emit('reload')" title="Reload">⟳</button>
     </div>
+
+    <div v-if="loading" class="state">Loading…</div>
+    <div v-else-if="error" class="state error">{{ error }}</div>
+    <div v-else-if="!conversations.length" class="state">
+      No conversations yet
+    </div>
+
+    <ul v-else class="items">
+      <li
+        v-for="c in conversations"
+        :key="c.id"
+        :class="['item', { active: c.id === activeId }]"
+        @click="$emit('select', c.id)"
+      >
+        <div class="title-row">
+          <div class="name">{{ c.otherName }}</div>
+          <div class="time">{{ c.lastTime ? formatTime(c.lastTime) : "" }}</div>
+        </div>
+        <div class="preview">
+          <span>{{ c.lastMessage || "Start chatting…" }}</span>
+          <span v-if="c.unread" class="badge">{{ c.unread }}</span>
+        </div>
+      </li>
+    </ul>
   </aside>
 </template>
 
-<script>
-export default {
-  name: 'ConversationList',
-  props: {
-    conversations: Array,
-    activeId: Number
+<script setup>
+defineProps({
+  conversations: { type: Array, default: () => [] },
+  activeId: { type: Number, default: null },
+  loading: { type: Boolean, default: false },
+  error: { type: String, default: "" },
+});
+function formatTime(t) {
+  try {
+    return new Date(t).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
   }
 }
 </script>
 
 <style scoped>
-.conversation-list {
-  background: #e6fff1;
-  padding: 1rem;
-  overflow-y: auto;
-}
-h2 {
-  color: #385716;
-  margin-top: -0.3rem;
-}
-.search {
-  width: 90%;
+.list {
+  border-right: 1px solid #e5e7eb;
+  background: #fff;
+  height: 100%;
+  overflow: auto;
   padding: 0.5rem;
+}
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0.25rem 0.5rem;
+}
+.reload {
   border: 1px solid #1b9536;
-  border-radius: 4px;
-  margin: 1rem 0;
-}
-.conversation-item {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.8rem;
-  cursor: pointer;
-  border-radius: 4px;
-}
-.conversation-item.active {
-  background: #F7FFBD;
-  color: white;
-}
-.avatar {
-  background: #d4ff87;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+  background: white;
   color: #1b9536;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-weight: bold;
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
 }
-.details strong {
-  color: #385716;
-  font-size: large;
+.state {
+  color: #666;
+  padding: 0.5rem;
 }
-.details p {
+.state.error {
+  color: #c92a2a;
+}
+.items {
+  list-style: none;
+  padding: 0;
   margin: 0;
-  font-size: 0.9rem;
-  color: #505050;
+}
+.item {
+  padding: 0.6rem 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.item:hover {
+  background: #f3f6f4;
+}
+.item.active {
+  background: #e9f7ee;
+}
+.title-row {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  color: #0c4a23;
+}
+.preview {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  color: #555;
+  font-size: 0.92rem;
+}
+.badge {
+  background: #1b9536;
+  color: white;
+  border-radius: 999px;
+  padding: 0 0.45rem;
+  font-size: 0.75rem;
 }
 </style>
