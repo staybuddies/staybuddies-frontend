@@ -71,7 +71,7 @@ async function onSubmit() {
 
     // go to intended page or profile
     router.push(
-      (route.query.redirect && route.query.redirect.toString()) || "/profile"
+      (route.query.redirect && route.query.redirect.toString()) || "/"
     );
   } catch (e) {
     console.error(e);

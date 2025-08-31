@@ -1,40 +1,14 @@
-<!-- <template>
-  <div>
-    <Navbar />
-    <HeroSection />
-    <PotentialRoommates />
-    <SmartMatching />
-    <StepsToMatch />
-    <UserTestimonials />
-    <CTASection />
-  </div>
-</template>
-
-<script>
-import HeroSection from '../components/HeroSection.vue'
-import PotentialRoommates from '../components/PotentialRoommates.vue'
-import SmartMatching from '../components/SmartMatching.vue'
-import StepsToMatch from '../components/StepsToMatch.vue'
-import UserTestimonials from '../components/UserTestimonials.vue'
-import CTASection from '../components/CTASection.vue'
-import Navbar from '../components/Home_Navbar.vue'
-
-export default {
-  components: {
-    Navbar,
-    HeroSection,
-    PotentialRoommates,
-    SmartMatching,
-    StepsToMatch,
-    UserTestimonials,
-    CTASection
-    
-  }
-}
-</script> -->
-
 <template>
   <main class="home">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="auth-actions">
+          <router-link class="btn ghost" to="/register">Sign up</router-link>
+          <router-link class="btn primary" to="/login">Log in</router-link>
+        </div>
+      </div>
+    </header>
+
     <section class="hero">
       <div class="copy">
         <h1>
@@ -51,15 +25,9 @@ export default {
           <button class="btn primary" @click="goQuiz">Take the Quiz →</button>
           <router-link class="btn ghost" to="/about">Learn more</router-link>
         </div>
-
-        <div class="auth-row">
-          <router-link class="btn link" to="/register">Sign up</router-link>
-          <router-link class="btn link" to="/login">Log in</router-link>
-        </div>
       </div>
 
       <div class="hero-art" aria-hidden="true">
-        <!-- Placeholder area for an illustration / image / Lottie -->
         <div class="placeholder">
           <span class="camera">🖼️</span>
           <span class="hint">Add your hero image</span>
@@ -67,7 +35,6 @@ export default {
       </div>
     </section>
 
-    <!-- Optional: features band -->
     <section class="features">
       <div class="card">
         <h3>Behavioral quiz</h3>
@@ -87,29 +54,41 @@ export default {
 
 <script setup>
 import { useRouter } from "vue-router";
-
 const router = useRouter();
 
-function isAuthed() {
-  // same token your axios instance uses
-  return !!localStorage.getItem("token");
-}
-
 function goQuiz() {
-  if (isAuthed()) {
-    router.push("/quiz");
-  } else {
-    router.push({ path: "/login", query: { redirect: "/quiz" } });
-  }
+  const authed = Boolean(localStorage.getItem("token"));
+  if (authed) router.push("/quiz");
+  else router.push({ path: "/login", query: { redirect: "/quiz" } });
 }
 </script>
 
 <style scoped>
 .home {
   min-height: 100vh;
-  background: #faffd6; /* soft lemon */
+  background: #faffd6;
   display: flex;
   flex-direction: column;
+}
+
+/* top-right auth header */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: transparent;
+}
+.topbar-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+.auth-actions {
+  display: flex;
+  gap: 0.6rem;
 }
 
 .hero {
@@ -117,7 +96,7 @@ function goQuiz() {
   grid-template-columns: 1.2fr 1fr;
   gap: 3rem;
   align-items: center;
-  padding: 5rem 2rem;
+  padding: 3rem 2rem 5rem;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -129,24 +108,18 @@ function goQuiz() {
   color: #075a2a;
   margin: 0 0 1rem;
 }
-
 .tagline {
   font-size: 1.1rem;
   color: #315343;
   margin: 0 0 1.5rem;
 }
-
 .cta-row {
   display: flex;
   gap: 0.75rem;
   margin-bottom: 0.75rem;
 }
 
-.auth-row {
-  display: flex;
-  gap: 0.75rem;
-}
-
+/* your existing button styles */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -160,23 +133,19 @@ function goQuiz() {
   cursor: pointer;
   user-select: none;
 }
-
 .btn:hover {
   transform: translateY(-1px);
 }
-
 .btn.primary {
   background: #1b9536;
   color: #fff;
   border-color: #1b9536;
 }
-
 .btn.ghost {
   background: #e6fff1;
   color: #1b9536;
   border-color: #a6e0bb;
 }
-
 .btn.link {
   background: transparent;
   color: #1b9536;
@@ -196,7 +165,6 @@ function goQuiz() {
   position: relative;
   overflow: hidden;
 }
-
 .placeholder .camera {
   font-size: 2rem;
   opacity: 0.7;
@@ -216,7 +184,6 @@ function goQuiz() {
   grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
 }
-
 .features .card {
   background: #fff;
   border: 1px solid #cbe8d2;
@@ -224,12 +191,10 @@ function goQuiz() {
   padding: 1.1rem;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06);
 }
-
 .features .card h3 {
   color: #0c4a23;
   margin: 0 0 0.3rem;
 }
-
 .features .card p {
   color: #315343;
   margin: 0;
@@ -238,10 +203,13 @@ function goQuiz() {
 @media (max-width: 950px) {
   .hero {
     grid-template-columns: 1fr;
-    padding-top: 3.5rem;
+    padding-top: 2rem;
   }
   .hero-art {
     order: -1;
+  }
+  .topbar-inner {
+    padding: 0.75rem 1rem;
   }
 }
 </style>

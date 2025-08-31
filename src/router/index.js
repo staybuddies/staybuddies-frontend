@@ -8,6 +8,7 @@ import Matches from "@/pages/Matches.vue";
 import Profile from "@/pages/Profile.vue";
 import Messages from "@/pages/Messages.vue";
 import Quiz from "@/pages/Quiz.vue";
+import Suspended from '@/pages/Suspended.vue';
 
 const routes = [
   { path: "/", name: "home", component: Home, alias: ["/home"] },
@@ -17,8 +18,14 @@ const routes = [
   { path: "/matches", component: Matches },
   { path: "/profile", component: Profile, meta: { requiresAuth: true } },
   { path: "/quiz", component: Quiz, meta: { requiresAuth: true } },
-  { path: "/messages", component: Messages, meta: { requiresAuth: true } },
-{ path: '/profile/:id', component: () => import('@/pages/PublicProfile.vue') }
+  { path: "/messages", component: Messages, meta: { requiresAuth: true } }, 
+  {
+    path: "/profile/:id",
+    name: "public-profile",
+    component: () => import("@/pages/PublicProfile.vue"),
+    meta: { requiresAuth: true },
+  },
+  { path: '/suspended', name: 'Suspended', component: Suspended },
 
 ];
 
