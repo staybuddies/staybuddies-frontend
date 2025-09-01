@@ -6,14 +6,16 @@
     <form v-if="!loading" @submit.prevent="saveBehavioral">
       <div class="grid">
         <label class="checkbox">
-          <input type="checkbox" v-model="behavior.locationSharing" /> Share my
-          rough location with matches
+          <input type="checkbox" v-model="behavior.locationSharing" />
+          Share my rough location with matches
         </label>
+
         <label class="checkbox">
-          <input type="checkbox" v-model="behavior.emailNotification" /> Email
-          me important updates
+          <input type="checkbox" v-model="behavior.emailNotification" />
+          Email me important updates
         </label>
       </div>
+
       <button class="primary">Save Behavioral</button>
     </form>
   </div>
@@ -25,20 +27,24 @@ import api from "@/api";
 
 const loading = ref(true);
 const error = ref("");
-const behavior = reactive({ locationSharing: false, emailNotification: false });
 
-onMounted(fetch);
+const behavior = reactive({
+  locationSharing: false,
+  emailNotification: false,
+});
 
-async function fetch() {
+onMounted(fetchBehavioral);
+
+async function fetchBehavioral() {
   loading.value = true;
   error.value = "";
   try {
     const { data } = await api.get("/room-finder/me");
-    behavior.locationSharing = data.locationSharing ?? false;
-    behavior.emailNotification = data.emailNotification ?? false;
+    behavior.locationSharing = Boolean(data.locationSharing);
+    behavior.emailNotification = Boolean(data.emailNotification);
   } catch (e) {
-    error.value = "Could not load behavioral settings.";
     console.error(e);
+    error.value = "Could not load behavioral settings.";
   } finally {
     loading.value = false;
   }
@@ -49,8 +55,8 @@ async function saveBehavioral() {
     await api.put("/room-finder/me/behavioral", { ...behavior });
     alert("Behavioral saved.");
   } catch (e) {
-    alert("Failed to save behavioral");
     console.error(e);
+    alert("Failed to save behavioral.");
   }
 }
 </script>
@@ -60,17 +66,18 @@ async function saveBehavioral() {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+  margin-bottom: 0.6rem;
 }
 .checkbox {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 0.5rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #0c4a23;
 }
 .primary {
-  margin-top: 1rem;
+  margin-top: 0.25rem;
   padding: 0.8rem 1.2rem;
   background: #1b9536;
   color: #fff;
@@ -84,7 +91,7 @@ async function saveBehavioral() {
 }
 .error {
   color: #c92a2a;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.35rem;
 }
 @media (max-width: 720px) {
   .grid {

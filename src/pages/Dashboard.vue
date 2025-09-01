@@ -6,7 +6,6 @@
       <p class="welcome">
         Welcome back! Here's an overview of your roommate matching journey.
       </p>
-
       <!-- Recent matches -->
       <div class="recent-matches">
         <div class="row">
@@ -99,7 +98,6 @@
           View All Matches
         </button>
       </div>
-
       <!-- You can keep your extra tabs -->
       <RoommateTabs />
     </section>
@@ -225,7 +223,6 @@ function statusLabel(m) {
       return "Not connected";
   }
 }
-
 /* ---------- lifecycle ---------- */
 onMounted(refresh);
 </script>

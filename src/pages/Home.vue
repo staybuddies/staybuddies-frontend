@@ -2,9 +2,15 @@
   <main class="home">
     <header class="topbar">
       <div class="topbar-inner">
-        <div class="auth-actions">
+        <!-- NOT authenticated -->
+        <div class="auth-actions" v-if="!isAuthed">
           <router-link class="btn ghost" to="/register">Sign up</router-link>
           <router-link class="btn primary" to="/login">Log in</router-link>
+        </div>
+
+        <!-- Authenticated -->
+        <div class="auth-actions" v-else>
+          <button class="btn ghost" @click="logout">Log out</button>
         </div>
       </div>
     </header>
@@ -53,14 +59,91 @@
 </template>
 
 <script setup>
+import { ref, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
+
 const router = useRouter();
 
+/* -------------------- helpers -------------------- */
+const BAD_TOKENS = new Set([
+  "",
+  "null",
+  "undefined",
+  "Bearer",
+  "Bearer null",
+  "Bearer undefined",
+]);
+
+function readTokenFromStorage() {
+  let t =
+    localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+
+  t = (t || "").trim();
+  if (t.startsWith("Bearer ")) t = t.slice(7).trim();
+  if (BAD_TOKENS.has(t)) return null;
+  return t;
+}
+
+function isJwtValid(jwt) {
+  // If it isn't a JWT, just treat the presence as truthy (some backends do opaque tokens)
+  const parts = (jwt || "").split(".");
+  if (parts.length !== 3) return true;
+  try {
+    const payload = JSON.parse(atob(parts[1]));
+    if (payload?.exp && Date.now() >= payload.exp * 1000) return false;
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+/* -------------------- auth state -------------------- */
+const isAuthed = ref(false);
+
+function refreshAuth() {
+  const t = readTokenFromStorage();
+  const ok = !!t && isJwtValid(t);
+  isAuthed.value = ok;
+
+  // Hard-clean if invalid so we don't keep showing "Log out"
+  if (!ok) {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+  }
+}
+
+function logout() {
+  localStorage.removeItem("token");
+  sessionStorage.removeItem("token");
+  window.dispatchEvent(new Event("sb-auth-changed"));
+  refreshAuth();
+  router.replace({ path: "/login" });
+}
+
 function goQuiz() {
-  const authed = Boolean(localStorage.getItem("token"));
-  if (authed) router.push("/quiz");
+  if (isAuthed.value) router.push("/quiz");
   else router.push({ path: "/login", query: { redirect: "/quiz" } });
 }
+
+function onStorage(e) {
+  if (e.key === "token") refreshAuth();
+}
+
+/* -------------------- lifecycle -------------------- */
+onMounted(() => {
+  refreshAuth();
+  window.addEventListener("sb-auth-changed", refreshAuth);
+  window.addEventListener("storage", onStorage);
+
+  // Also re-check when tab regains focus (helps during dev)
+  window.addEventListener("focus", refreshAuth);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("sb-auth-changed", refreshAuth);
+  window.removeEventListener("storage", onStorage);
+  window.removeEventListener("focus", refreshAuth);
+});
 </script>
 
 <style scoped>
@@ -100,7 +183,6 @@ function goQuiz() {
   max-width: 1200px;
   margin: 0 auto;
 }
-
 .copy h1 {
   font-size: clamp(2.2rem, 5vw, 4rem);
   line-height: 1.05;
@@ -119,7 +201,7 @@ function goQuiz() {
   margin-bottom: 0.75rem;
 }
 
-/* your existing button styles */
+/* buttons */
 .btn {
   display: inline-flex;
   align-items: center;

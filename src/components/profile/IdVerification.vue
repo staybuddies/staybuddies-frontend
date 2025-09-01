@@ -60,19 +60,19 @@
       <p v-if="otpError" class="small error">{{ otpError }}</p>
     </div>
 
-    <!-- STUDENT ID VERIFICATION (unchanged logic; keep if you use it) -->
+    <!-- STUDENT ID VERIFICATION -->
     <div class="card idv-card">
       <div class="row-head">
         <h2>Student ID Card</h2>
-        <span v-if="idv.status" :class="['pill', statusClass]">{{
-          statusLabel
-        }}</span>
+        <span v-if="idv.status" :class="['pill', statusClass]">
+          {{ statusLabel }}
+        </span>
       </div>
 
+      <!-- Start -->
       <div v-if="!idv.id" class="start">
         <p class="muted">
-          Start a verification to upload photos of your student ID (front/back)
-          and an optional selfie.
+          Upload the <strong>front</strong> of your student ID (required).
         </p>
         <button
           class="primary"
@@ -83,32 +83,19 @@
         </button>
       </div>
 
+      <!-- Single uploader + Submit -->
       <div v-else>
         <div class="upload-grid">
           <div class="uploader">
-            <div class="thumb" :style="bg(idv.frontUrl)">Front</div>
+            <div class="thumb" :key="idv.frontUrl" :style="bg(idv.frontUrl)">
+              <template v-if="!idv.frontUrl">
+                Front <small>(required)</small>
+              </template>
+            </div>
             <input
               type="file"
               accept="image/*"
               @change="onPick($event, 'front')"
-            />
-          </div>
-
-          <div class="uploader">
-            <div class="thumb" :style="bg(idv.backUrl)">Back</div>
-            <input
-              type="file"
-              accept="image/*"
-              @change="onPick($event, 'back')"
-            />
-          </div>
-
-          <div class="uploader">
-            <div class="thumb" :style="bg(idv.selfieUrl)">Selfie</div>
-            <input
-              type="file"
-              accept="image/*"
-              @change="onPick($event, 'selfie')"
             />
           </div>
         </div>
@@ -117,44 +104,64 @@
           <button
             class="primary"
             @click="submitVerification"
-            :disabled="submitting || !idv.id"
+            :disabled="submitting || !idv.id || !idv.frontUrl"
           >
             {{ submitting ? "Submitting…" : "Submit for Review" }}
           </button>
-          <span class="muted" v-if="idv.status === 'REJECTED' && idv.note"
-            >Reason: {{ idv.note }}</span
-          >
+          <span class="muted" v-if="idv.status === 'REJECTED' && idv.note">
+            Reason: {{ idv.note }}
+          </span>
+          <span class="muted" v-else-if="idv.status === 'VERIFIED' && idv.note">
+            {{ idv.note }}
+          </span>
         </div>
 
+        <!-- Results (only Score + Student ID) -->
         <div class="result-grid" v-if="idv.status">
           <div>
             <strong>Score</strong>
-            <div class="score">{{ idv.score ?? "—" }}</div>
-          </div>
-          <div>
-            <strong>Name on card</strong>
-            <div>{{ idv.nameOnCard || "—" }}</div>
+            <div class="score">{{ formattedScore }}</div>
           </div>
           <div>
             <strong>Student ID</strong>
             <div>{{ idv.studentIdOnCard || "—" }}</div>
           </div>
-          <div>
-            <strong>University</strong>
-            <div>{{ idv.universityOnCard || "—" }}</div>
-          </div>
         </div>
       </div>
     </div>
+
+    <p v-if="idvError" class="error">{{ idvError }}</p>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted } from "vue";
+import { reactive, ref, computed, onMounted, onBeforeUnmount } from "vue";
 import api from "@/api";
 
+/* ---------- helpers ---------- */
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
+function toAbs(u) {
+  if (!u) return "";
+  // treat http(s), blob, and data URIs as absolute
+  if (/^(https?:|blob:|data:)/i.test(u)) return u;
+  return `${API_BASE}${u.startsWith("/") ? "" : "/"}${u}`;
+}
+function bg(u) {
+  if (!u) return {};
+  const abs = toAbs(u);
+  const isBlob = /^blob:/i.test(abs) || /^data:/i.test(abs);
+  const final = isBlob
+    ? abs
+    : `${abs}${abs.includes("?") ? "&" : "?"}t=${Date.now()}`;
+  return { backgroundImage: `url("${final}")` };
+}
+
+/* ---------- state ---------- */
 const idvLoading = ref(false);
 const submitting = ref(false);
+const idvError = ref("");
+const lastBlobUrl = ref("");
+
 const idv = reactive({
   id: null,
   status: null,
@@ -163,6 +170,7 @@ const idv = reactive({
   nameOnCard: "",
   studentIdOnCard: "",
   universityOnCard: "",
+  gradYearOnCard: null,
   frontUrl: "",
   backUrl: "",
   selfieUrl: "",
@@ -177,11 +185,20 @@ const otpCode = ref("");
 const otpStatus = ref("");
 const otpError = ref("");
 
+/* ---------- lifecycle ---------- */
 onMounted(async () => {
   await fetchProfileBits();
   await fetchIdv();
 });
 
+onBeforeUnmount(() => {
+  if (lastBlobUrl.value) {
+    URL.revokeObjectURL(lastBlobUrl.value);
+    lastBlobUrl.value = "";
+  }
+});
+
+/* ---------- profile/email ---------- */
 async function fetchProfileBits() {
   try {
     const { data } = await api.get("/room-finder/me");
@@ -192,7 +209,6 @@ async function fetchProfileBits() {
   }
 }
 
-// Generic email validation
 const isValidEmail = computed(() => {
   const e = (schoolEmail.value || "").trim();
   if (!e || !e.includes("@")) return false;
@@ -209,7 +225,6 @@ async function requestOtp(e) {
       params: { email: schoolEmail.value },
     });
     otpStatus.value = "Code sent to your email.";
-    // when you request a new code, backend also resets verified=false for your account
     schoolEmailVerified.value = false;
   } catch (err) {
     otpError.value = "Could not send code. Check the email address.";
@@ -228,10 +243,8 @@ async function confirmOtp(e) {
     const { data } = await api.post("/verify-email/confirm", null, {
       params: { email: schoolEmail.value, code: otpCode.value },
     });
-    // flip from server truth
     schoolEmail.value = data?.schoolEmail ?? schoolEmail.value;
     schoolEmailVerified.value = Boolean(data?.schoolEmailVerified);
-
     otpCode.value = "";
     otpStatus.value = "Email verified.";
   } catch (err) {
@@ -242,33 +255,55 @@ async function confirmOtp(e) {
   }
 }
 
-/* --- student id --- */
+/* ---------- ID verification ---------- */
 async function fetchIdv() {
   idvLoading.value = true;
+  idvError.value = "";
   try {
     const { data } = await api.get("/verifications/student-id/me");
-    if (data) Object.assign(idv, data);
-    else
+    if (data) {
+      Object.assign(idv, {
+        id: data.id,
+        status: data.status,
+        score: data.score,
+        note: data.note,
+        nameOnCard: data.nameOnCard,
+        studentIdOnCard: data.studentIdOnCard,
+        universityOnCard: data.universityOnCard,
+        gradYearOnCard: data.gradYearOnCard,
+        frontUrl: toAbs(data.frontUrl),
+        backUrl: toAbs(data.backUrl),
+        selfieUrl: toAbs(data.selfieUrl),
+      });
+    } else {
       Object.assign(idv, {
         id: null,
         status: null,
         score: null,
         note: "",
+        nameOnCard: "",
+        studentIdOnCard: "",
+        universityOnCard: "",
+        gradYearOnCard: null,
         frontUrl: "",
         backUrl: "",
         selfieUrl: "",
       });
+    }
   } catch (e) {
     console.error(e);
+    idvError.value = "Could not load verification.";
   } finally {
     idvLoading.value = false;
   }
 }
+
 async function createVerification() {
   try {
     idvLoading.value = true;
     const { data } = await api.post("/verifications/student-id/create");
     idv.id = data?.id;
+    idv.status = data?.status ?? "DRAFT";
   } catch (e) {
     alert("Could not start verification.");
     console.error(e);
@@ -276,39 +311,68 @@ async function createVerification() {
     idvLoading.value = false;
   }
 }
+
 async function onPick(evt, side) {
   const file = evt.target?.files?.[0];
   if (!file || !idv.id) return;
+
+  // revoke previous blob preview if any
+  if (lastBlobUrl.value) {
+    URL.revokeObjectURL(lastBlobUrl.value);
+    lastBlobUrl.value = "";
+  }
+
+  // Instant local preview (front only)
+  const blobUrl = URL.createObjectURL(file);
+  lastBlobUrl.value = blobUrl;
+  if (side === "front") idv.frontUrl = blobUrl;
+
   const fd = new FormData();
   fd.append("side", side);
   fd.append("file", file);
+
   try {
     await api.put(`/verifications/student-id/${idv.id}/upload`, fd, {
       headers: { "Content-Type": "multipart/form-data" },
     });
+    // get the fresh server URL (with new filename)
     await fetchIdv();
   } catch (e) {
     alert("Upload failed.");
     console.error(e);
   } finally {
-    evt.target.value = "";
+    // let user pick the same file again and still trigger 'change'
+    if (evt?.target) evt.target.value = "";
   }
 }
+
 async function submitVerification() {
-  if (!idv.id) return;
+  if (!idv.id || !idv.frontUrl) return;
   try {
     submitting.value = true;
     await api.put(`/verifications/student-id/${idv.id}/submit`);
-    await fetchIdv();
-    alert("Submitted. We’ll process this shortly.");
+    await fetchIdv(); // updates score/fields/status
+    alert(
+      idv.status === "VERIFIED"
+        ? "Verified! Your email and card ID match."
+        : "Submitted. Result: " + (idv.note || idv.status)
+    );
   } catch (e) {
-    alert("Could not submit.");
+    const s = e?.response?.status;
+    if (s === 502 || s === 504) {
+      alert(
+        "Verification service is unavailable. Please try again in a minute."
+      );
+    } else {
+      alert("Could not submit.");
+    }
     console.error(e);
   } finally {
     submitting.value = false;
   }
 }
 
+/* ---------- computed ---------- */
 const statusClass = computed(() =>
   idv.status === "VERIFIED"
     ? "pill-ok"
@@ -327,9 +391,10 @@ const statusLabel = computed(() =>
     ? "Pending"
     : "—"
 );
-function bg(url) {
-  return url ? { backgroundImage: `url(${url})` } : {};
-}
+
+const formattedScore = computed(() =>
+  idv.score == null ? "—" : Number(idv.score).toFixed(3)
+);
 </script>
 
 <style scoped>
@@ -401,6 +466,7 @@ select {
   justify-content: space-between;
   margin-bottom: 0.5rem;
 }
+
 .badge {
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
@@ -437,9 +503,10 @@ select {
   color: #a61b1b;
 }
 
+/* ONE uploader */
 .upload-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 1rem;
   margin: 0.5rem 0 0.75rem;
 }
@@ -459,6 +526,7 @@ select {
   color: #1b9536;
   font-weight: 800;
 }
+
 .actions-row {
   display: flex;
   gap: 0.5rem;
@@ -471,9 +539,10 @@ select {
   text-align: center;
 }
 
+/* results: only 2 columns */
 .result-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
   background: #f7fff0;
   border: 1px dashed #b8f1ce;
@@ -490,14 +559,6 @@ select {
   font-weight: 800;
 }
 
-@media (max-width: 900px) {
-  .upload-grid {
-    grid-template-columns: 1fr;
-  }
-  .result-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
 @media (max-width: 720px) {
   .grid {
     grid-template-columns: 1fr;
