@@ -1,17 +1,24 @@
 <template>
-  <main class="home">
-    <header class="topbar">
-      <div class="topbar-inner">
-        <div class="auth-actions" v-if="!isAuthed">
-          <router-link class="btn ghost" to="/register">Sign up</router-link>
-          <router-link class="btn primary" to="/login">Log in</router-link>
-        </div>
-        <div class="auth-actions" v-else>
-          <button class="btn ghost" @click="logout">Log out</button>
-        </div>
+  <header class="navbar">
+    <div class="navbar-container">
+      <!-- left: logo + brand -->
+      <div class="left">
+        <img src="@/assets/logo.png" alt="StayBuddies" class="logo" />
+        <span class="brand">StayBuddies</span>
       </div>
-    </header>
 
+      <!-- right: auth actions -->
+      <div class="auth-actions" v-if="!isAuthed">
+        <router-link class="btn ghost" to="/register">Sign up</router-link>
+        <router-link class="btn primary" to="/login">Log in</router-link>
+      </div>
+      <div class="auth-actions" v-else>
+        <button class="btn ghost" @click="logout">Log out</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="home">
     <section class="hero">
       <div class="hero-inner">
         <div class="copy">
@@ -22,23 +29,50 @@
           </p>
           <div class="cta-row">
             <button class="btn primary" @click="goQuiz">Take the Quiz</button>
-            <router-link class="btn ghost" to="/browse"
-              >Browse Listings</router-link
-            >
+            <router-link class="btn ghost" to="/browse">
+              Browse Listings
+            </router-link>
           </div>
         </div>
 
         <div class="hero-art" aria-hidden="true">
-          <img
-            src="/images/finding-roomate-2.jpg"
-            alt="Roommate Hero"
-            class="hero-image"
-          />
+          <div class="hero-slider" @mouseenter="pause()" @mouseleave="resume()">
+            <div class="slides" :style="trackStyle">
+              <div
+                class="slide"
+                v-for="(img, i) in images"
+                :key="i"
+                role="img"
+                :aria-label="img.alt || 'Roommate photo'"
+              >
+                <img :src="img.src" :alt="img.alt || 'Roommate photo'" />
+              </div>
+            </div>
+
+            <!-- controls (optional) -->
+            <button class="nav prev" @click="prev" aria-label="Previous">
+              &#10094;
+            </button>
+            <button class="nav next" @click="next" aria-label="Next">
+              &#10095;
+            </button>
+
+            <!-- dots -->
+            <div class="dots">
+              <button
+                v-for="(img, i) in images"
+                :key="'dot-' + i"
+                :class="['dot', { active: i === index }]"
+                @click="go(i)"
+                :aria-label="`Go to slide ${i + 1}`"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- featured cards -->
+    <!-- featured listings -->
     <section class="section">
       <div class="container">
         <h2 class="section-title">Featured Roommate Listings</h2>
@@ -90,7 +124,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount } from "vue";
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import api from "@/api";
 
@@ -201,6 +235,65 @@ onBeforeUnmount(() => {
   window.removeEventListener("sb-auth-changed", refreshAuth);
   window.removeEventListener("focus", refreshAuth);
 });
+
+const images = ref([
+  { src: '/images/finding-roomate-2.jpg', alt: 'Group studying in living room' },
+  { src: '/images/image1.jpg',       alt: 'Roommates chatting' },
+  { src: '/images/image2.jpg',       alt: 'Kitchen hangout' },
+  { src: '/images/image3.jpg',       alt: 'Shared workspace' },
+  { src: '/images/image4.jpg',       alt: 'Movie night' },
+])
+
+const index = ref(0)
+const intervalMs = 2000
+let timer = null
+
+
+
+const trackStyle = computed(() => ({
+  transform: `translateX(-${index.value * 100}%)`
+}))
+
+function next()   { index.value = (index.value + 1) % images.value.length }
+function prev()   { index.value = (index.value - 1 + images.value.length) % images.value.length }
+function go(i) { index.value = i }
+
+const autoplay = true
+
+function start() {
+  stop()
+  if (!autoplay || images.value.length <= 1) return
+  timer = window.setInterval(next, intervalMs)
+}
+function stop() {
+  if (timer !== null) {
+    clearInterval(timer)
+    timer = null
+  }
+}
+function pause()  { stop() }
+function resume() { start() }
+
+// pause when tab hidden, resume when visible
+function handleVisibility() {
+  if (document.hidden) stop()
+  else start()
+}
+
+onMounted(() => {
+  start()
+  document.addEventListener('visibilitychange', handleVisibility)
+  window.addEventListener('blur', stop)     // optional: pause when switching apps
+  window.addEventListener('focus', start)   // optional: resume on focus
+})
+onBeforeUnmount(() => {
+  stop()
+  document.removeEventListener('visibilitychange', handleVisibility)
+  window.removeEventListener('blur', stop)
+  window.removeEventListener('focus', start)
+})
+
+
 </script>
 
 <style scoped>
@@ -208,29 +301,68 @@ onBeforeUnmount(() => {
 </style>
 
 <style scoped>
-.home {
-  min-height: 100vh;
-  background: #fff;
-}
-
-/* your original auth-only topbar */
-.topbar {
+/* HEADER (navbar + auth on one line) */
+.navbar {
   position: sticky;
   top: 0;
-  z-index: 20;
-  background: transparent;
+  z-index: 50;
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+  width: 100%;
 }
-.topbar-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 1rem 2rem;
+
+.navbar-container {
+  max-width: 1200px; /* match hero width */
+  margin: 0 auto; /* center */
+  padding: 0.75rem 1rem; /* comfy horizontal padding */
   display: flex;
-  justify-content: flex-end;
   align-items: center;
+  justify-content: space-between;
+  gap: 1rem; /* prevents crowding on small widths */
 }
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem; /* space between logo and brand */
+  min-width: 0;
+}
+
+.logo {
+  height: 40px; /* keep logo tidy */
+  width: auto;
+  display: block;
+  object-fit: contain;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #075a2a;
+  white-space: nowrap;
+}
+
 .auth-actions {
   display: flex;
   gap: 0.6rem;
+  flex-wrap: wrap; /* avoids overflow on narrow screens */
+}
+
+/* Remove the old topbar spacing if you still have it */
+.topbar,
+.topbar-inner {
+  padding: 0;
+  margin: 0;
+}
+
+/* RESPONSIVE: tighten padding and hide brand if it gets too tight */
+@media (max-width: 560px) {
+  .navbar-container {
+    padding: 0.6rem 0.8rem;
+  }
+  .brand {
+    display: none;
+  } /* optional: keep just the icon on small screens */
 }
 
 /* hero */
@@ -276,6 +408,79 @@ onBeforeUnmount(() => {
   border: 1px solid #cbe8d2;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
 }
+/* HERO SLIDER */
+.hero-art {
+  position: relative;
+  width: 100%;
+}
+
+.hero-slider {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid #cbe8d2;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+  /* Keep same visual size as before */
+  max-height: 400px;
+}
+
+.slides {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  transition: transform 600ms ease;
+  will-change: transform;           /* GPU accelerated */
+}
+
+.slide {
+  min-width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.slide img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 400px;
+  object-fit: cover;
+}
+
+/* Nav arrows */
+.nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: rgba(255,255,255,0.8);
+  padding: 0.4rem 0.6rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+.nav:hover { background: #fff; }
+.nav.prev { left: 10px; }
+.nav.next { right: 10px; }
+
+/* Dots */
+.dots {
+  position: absolute;
+  left: 0; right: 0; bottom: 10px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(0,0,0,0.08);
+  cursor: pointer;
+}
+.dot.active { background: #1b9536; }
+
 
 .section {
   padding: 1.6rem 0 2.6rem;
