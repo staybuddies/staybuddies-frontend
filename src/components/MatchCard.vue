@@ -19,10 +19,9 @@
     </div>
 
     <div class="actions">
-      <!-- View public profile -->
       <router-link
         class="btn-secondary"
-        :to="`/profile/${match.userId}`"
+        :to="{ name: 'public-profile', params: { id: String(match.userId) } }"
         title="View profile"
       >
         View Profile

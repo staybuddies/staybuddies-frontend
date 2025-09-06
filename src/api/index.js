@@ -2,7 +2,6 @@
 import axios from "axios";
 import router from "@/router";
 
-// Prefer a relative base to use Vite proxy. If you want absolute, it's fine too.
 const api = axios.create({
   baseURL: "/api/v1", // or: import.meta.env.VITE_API_BASE + "/api/v1"
 });

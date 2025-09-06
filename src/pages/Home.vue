@@ -2,13 +2,10 @@
   <main class="home">
     <header class="topbar">
       <div class="topbar-inner">
-        <!-- NOT authenticated -->
         <div class="auth-actions" v-if="!isAuthed">
           <router-link class="btn ghost" to="/register">Sign up</router-link>
           <router-link class="btn primary" to="/login">Log in</router-link>
         </div>
-
-        <!-- Authenticated -->
         <div class="auth-actions" v-else>
           <button class="btn ghost" @click="logout">Log out</button>
         </div>
@@ -16,55 +13,90 @@
     </header>
 
     <section class="hero">
-      <div class="copy">
-        <h1>
-          Find Your Perfect<br />
-          Roommate with AI-<br />
-          powered Compatibility!
-        </h1>
-        <p class="tagline">
-          Our AI-powered matching system analyzes lifestyle, behavior patterns,
-          and preferences to find your ideal roommate.
-        </p>
-
-        <div class="cta-row">
-          <button class="btn primary" @click="goQuiz">Take the Quiz →</button>
-          <router-link class="btn ghost" to="/about">Learn more</router-link>
+      <div class="hero-inner">
+        <div class="copy">
+          <h1>Find Your Ideal Roommate<br />Today</h1>
+          <p class="tagline">
+            Explore the easiest way to connect and share your space with
+            students like you.
+          </p>
+          <div class="cta-row">
+            <button class="btn primary" @click="goQuiz">Take the Quiz</button>
+            <router-link class="btn ghost" to="/browse"
+              >Browse Listings</router-link
+            >
+          </div>
         </div>
-      </div>
 
-      <div class="hero-art" aria-hidden="true">
-        <div class="placeholder">
-          <span class="camera">🖼️</span>
-          <span class="hint">Add your hero image</span>
+        <div class="hero-art" aria-hidden="true">
+          <img
+            src="/images/finding-roomate-2.jpg"
+            alt="Roommate Hero"
+            class="hero-image"
+          />
         </div>
       </div>
     </section>
 
-    <section class="features">
-      <div class="card">
-        <h3>Behavioral quiz</h3>
-        <p>10 quick questions to learn your lifestyle and preferences.</p>
-      </div>
-      <div class="card">
-        <h3>Smart matching</h3>
-        <p>We compute compatibility scores to surface your best matches.</p>
-      </div>
-      <div class="card">
-        <h3>Safe & private</h3>
-        <p>Your data stays secure; you control what you share.</p>
+    <!-- featured cards -->
+    <section class="section">
+      <div class="container">
+        <h2 class="section-title">Featured Roommate Listings</h2>
+
+        <div v-if="error" class="error">{{ error }}</div>
+
+        <div v-if="loading" class="cards">
+          <div class="card skeleton" v-for="i in 4" :key="i"></div>
+        </div>
+
+        <div v-else class="cards">
+          <article
+            class="card"
+            v-for="c in listings"
+            :key="c.id ?? `row-${Math.random()}`"
+          >
+            <div class="thumb" :style="thumbStyle(c.photoUrl)">
+              <span v-if="!c.photoUrl" class="thumb-ph">No photo</span>
+            </div>
+            <div class="card-body">
+              <h3 class="title">{{ c.name || "Roommate" }}</h3>
+              <div class="meta">
+                <span v-if="c.university">{{ c.university }}</span>
+                <span v-if="c.location"> • {{ c.location }}</span>
+              </div>
+            </div>
+            <div class="card-actions">
+              <router-link
+                v-if="c.id"
+                class="btn ghost"
+                :to="{
+                  name: 'roomfinder-public',
+                  params: { id: String(c.id) },
+                }"
+              >
+                View Details
+              </router-link>
+              <button v-else class="btn ghost" disabled>View Details</button>
+            </div>
+          </article>
+
+          <div v-if="!listings.length" class="empty">
+            No featured users yet.
+          </div>
+        </div>
       </div>
     </section>
   </main>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref, reactive, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
+import api from "@/api";
 
 const router = useRouter();
 
-/* -------------------- helpers -------------------- */
+/* ---------- auth ---------- */
 const BAD_TOKENS = new Set([
   "",
   "null",
@@ -73,88 +105,115 @@ const BAD_TOKENS = new Set([
   "Bearer null",
   "Bearer undefined",
 ]);
-
-function readTokenFromStorage() {
-  let t =
-    localStorage.getItem("token") || sessionStorage.getItem("token") || "";
-
-  t = (t || "").trim();
-  if (t.startsWith("Bearer ")) t = t.slice(7).trim();
-  if (BAD_TOKENS.has(t)) return null;
-  return t;
-}
-
-function isJwtValid(jwt) {
-  // If it isn't a JWT, just treat the presence as truthy (some backends do opaque tokens)
-  const parts = (jwt || "").split(".");
-  if (parts.length !== 3) return true;
-  try {
-    const payload = JSON.parse(atob(parts[1]));
-    if (payload?.exp && Date.now() >= payload.exp * 1000) return false;
-    return true;
-  } catch {
-    return true;
-  }
-}
-
-/* -------------------- auth state -------------------- */
 const isAuthed = ref(false);
 
+function readToken() {
+  let t =
+    localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+  t = (t || "").trim();
+  if (t.startsWith("Bearer ")) t = t.slice(7).trim();
+  return BAD_TOKENS.has(t) ? null : t;
+}
+function isJwtValid(jwt) {
+  const parts = (jwt || "").split(".");
+  if (parts.length !== 3) return !!jwt;
+  try {
+    const payload = JSON.parse(atob(parts[1]));
+    return !(payload?.exp && Date.now() >= payload.exp * 1000);
+  } catch {
+    return !!jwt;
+  }
+}
 function refreshAuth() {
-  const t = readTokenFromStorage();
+  const t = readToken();
   const ok = !!t && isJwtValid(t);
   isAuthed.value = ok;
-
-  // Hard-clean if invalid so we don't keep showing "Log out"
   if (!ok) {
     localStorage.removeItem("token");
     sessionStorage.removeItem("token");
   }
 }
-
 function logout() {
   localStorage.removeItem("token");
   sessionStorage.removeItem("token");
   window.dispatchEvent(new Event("sb-auth-changed"));
   refreshAuth();
-  router.replace({ path: "/login" });
+  router.replace("/login");
 }
-
 function goQuiz() {
-  if (isAuthed.value) router.push("/quiz");
-  else router.push({ path: "/login", query: { redirect: "/quiz" } });
+  isAuthed.value
+    ? router.push("/quiz")
+    : router.push({ path: "/login", query: { redirect: "/quiz" } });
 }
 
-function onStorage(e) {
-  if (e.key === "token") refreshAuth();
+/* ---------- featured listings ---------- */
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
+const listings = reactive([]);
+const loading = ref(false);
+const error = ref("");
+
+function absUrl(u) {
+  if (!u) return "";
+  if (/^https?:\/\//i.test(u)) return u;
+  return `${API_BASE}${u.startsWith("/") ? "" : "/"}${u}`;
+}
+function thumbStyle(url) {
+  if (!url) return {};
+  const u = absUrl(url);
+  return {
+    backgroundImage: `url("${u}${u.includes("?") ? "&" : "?"}t=${Date.now()}")`,
+  };
 }
 
-/* -------------------- lifecycle -------------------- */
+async function fetchFeatured() {
+  loading.value = true;
+  error.value = "";
+  listings.splice(0);
+
+  try {
+    const { data } = await api.get("/room-finder/public?size=8");
+    const rows = Array.isArray(data) ? data : data?.content || [];
+    rows.forEach((r) => {
+      listings.push({
+        id: r.id,
+        name: r.name,
+        university: r.university,
+        location: r.location,
+        photoUrl: r.photoUrl,
+      });
+    });
+  } catch (e) {
+    console.error(e);
+    error.value = "Could not load featured users.";
+  } finally {
+    loading.value = false;
+  }
+}
+
+/* ---------- lifecycle ---------- */
 onMounted(() => {
   refreshAuth();
+  fetchFeatured();
   window.addEventListener("sb-auth-changed", refreshAuth);
-  window.addEventListener("storage", onStorage);
-
-  // Also re-check when tab regains focus (helps during dev)
   window.addEventListener("focus", refreshAuth);
 });
-
 onBeforeUnmount(() => {
   window.removeEventListener("sb-auth-changed", refreshAuth);
-  window.removeEventListener("storage", onStorage);
   window.removeEventListener("focus", refreshAuth);
 });
 </script>
 
 <style scoped>
+/* (unchanged styles)… */
+</style>
+
+<style scoped>
 .home {
   min-height: 100vh;
-  background: #faffd6;
-  display: flex;
-  flex-direction: column;
+  background: #fff;
 }
 
-/* top-right auth header */
+/* your original auth-only topbar */
 .topbar {
   position: sticky;
   top: 0;
@@ -174,49 +233,117 @@ onBeforeUnmount(() => {
   gap: 0.6rem;
 }
 
+/* hero */
 .hero {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 3rem;
-  align-items: center;
-  padding: 3rem 2rem 5rem;
+  background: #f2fff3;
+  border-bottom: 1px solid #edf5ef;
+}
+.hero-inner {
   max-width: 1200px;
   margin: 0 auto;
+  padding: 2.2rem 1rem 2.8rem;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 2rem;
+  align-items: center;
 }
 .copy h1 {
-  font-size: clamp(2.2rem, 5vw, 4rem);
-  line-height: 1.05;
-  letter-spacing: -0.5px;
+  margin: 0 0 0.6rem;
+  font-size: clamp(2rem, 4.8vw, 3.1rem);
   color: #075a2a;
-  margin: 0 0 1rem;
 }
 .tagline {
-  font-size: 1.1rem;
   color: #315343;
-  margin: 0 0 1.5rem;
+  margin: 0 0 1rem;
 }
 .cta-row {
   display: flex;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  gap: 0.65rem;
+}
+.hero-art .placeholder {
+  width: 100%;
+  aspect-ratio: 16/9;
+  border-radius: 16px;
+  background: #cfdad2;
+  opacity: 0.65;
+  border: 1px solid #cbe8d2;
+}
+.hero-image {
+  width: 100%;
+  max-height: 400px;
+  object-fit: cover;
+  border-radius: 16px;
+  border: 1px solid #cbe8d2;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
 }
 
-/* buttons */
+.section {
+  padding: 1.6rem 0 2.6rem;
+}
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+.section-title {
+  margin: 0 0 0.9rem;
+  color: #0c4a23;
+  font-size: 1.25rem;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+.card {
+  background: #fff;
+  border: 1px solid #cbe8d2;
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.06);
+}
+.thumb {
+  height: 180px;
+  background: #eef7f1;
+  background-size: cover;
+  background-position: center;
+}
+.thumb-ph {
+  color: #6b7b74;
+  padding: 0.6rem;
+  display: inline-block;
+}
+.card-body {
+  padding: 0.75rem 0.9rem 0.3rem;
+}
+.title {
+  margin: 0 0 0.25rem;
+  color: #0c4a23;
+  font-size: 1.05rem;
+}
+.meta {
+  color: #597168;
+  font-size: 0.92rem;
+}
+.card-actions {
+  padding: 0.7rem 0.9rem 1rem;
+  margin-top: auto;
+}
+
+/* buttons (keep your palette) */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 10px;
-  padding: 0.9rem 1.2rem;
-  font-weight: 700;
+  padding: 0.8rem 1.1rem;
+  font-weight: 800;
   text-decoration: none;
   border: 1px solid transparent;
-  transition: transform 120ms ease, box-shadow 120ms ease;
   cursor: pointer;
-  user-select: none;
-}
-.btn:hover {
-  transform: translateY(-1px);
 }
 .btn.primary {
   background: #1b9536;
@@ -228,70 +355,50 @@ onBeforeUnmount(() => {
   color: #1b9536;
   border-color: #a6e0bb;
 }
-.btn.link {
-  background: transparent;
-  color: #1b9536;
-  padding-left: 0;
-  padding-right: 0;
-  border: none;
-}
-
-.hero-art .placeholder {
-  aspect-ratio: 1 / 1;
-  width: min(560px, 85vw);
-  background: #eee;
-  border: 1px dashed #cbd5d1;
-  border-radius: 16px;
-  display: grid;
-  place-items: center;
-  position: relative;
-  overflow: hidden;
-}
-.placeholder .camera {
-  font-size: 2rem;
-  opacity: 0.7;
-}
-.placeholder .hint {
-  position: absolute;
-  bottom: 1rem;
-  font-size: 0.95rem;
-  color: #6b7972;
-}
-
-.features {
-  max-width: 1100px;
-  margin: 0 auto 3rem;
-  padding: 0 2rem;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-}
-.features .card {
+.btn.outline {
   background: #fff;
-  border: 1px solid #cbe8d2;
-  border-radius: 14px;
-  padding: 1.1rem;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06);
-}
-.features .card h3 {
-  color: #0c4a23;
-  margin: 0 0 0.3rem;
-}
-.features .card p {
-  color: #315343;
-  margin: 0;
+  color: #1b9536;
+  border-color: #a6e0bb;
 }
 
-@media (max-width: 950px) {
-  .hero {
+.error {
+  color: #c92a2a;
+  margin: 0.5rem 0;
+}
+.empty {
+  color: #597168;
+  padding: 0.8rem 0;
+}
+
+/* skeleton shimmer */
+.skeleton {
+  height: 260px;
+  border-radius: 14px;
+  border: 1px solid #cbe8d2;
+  background: linear-gradient(90deg, #f2fbf5 25%, #e9f6ee 37%, #f2fbf5 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+@media (max-width: 980px) {
+  .hero-inner {
     grid-template-columns: 1fr;
-    padding-top: 2rem;
   }
-  .hero-art {
-    order: -1;
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .topbar-inner {
-    padding: 0.75rem 1rem;
+}
+@media (max-width: 560px) {
+  .cards {
+    grid-template-columns: 1fr;
   }
 }
 </style>

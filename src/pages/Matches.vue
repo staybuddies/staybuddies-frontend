@@ -55,7 +55,6 @@ async function load() {
   error.value = "";
   try {
     const { data } = await api.get("/matches");
-    // expected each item: { userId, name, age, gender, location, compatibility, relationStatus, requestId? }
     matches.value = Array.isArray(data) ? data : [];
   } catch (e) {
     console.error(e);
