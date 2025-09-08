@@ -46,9 +46,20 @@
       </ul>
 
       <div class="right-icons">
-        <!-- Bigger bell with badge -->
         <button class="bell" @click="openMessages" aria-label="Notifications">
-          <span class="nav-icon">🔔</span>
+          <svg
+            class="bell-svg"
+            viewBox="0 0 24 24"
+            width="28"
+            height="28"
+            aria-hidden="true"
+            :class="{ ring: justIncremented }"
+          >
+            <path
+              d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 1 0-14 0v5l-2 2v1h20v-1l-2-2Z"
+              fill="currentColor"
+            />
+          </svg>
           <span v-if="unreadCount" class="badge">{{ badgeText }}</span>
         </button>
       </div>
@@ -65,14 +76,23 @@ import { connect, subscribeJson } from "@/ws/stomp";
 const router = useRouter();
 
 const unreadCount = ref(0);
-const activeThreadId = ref(null); // learned from Messages.vue
 const badgeText = computed(() =>
   unreadCount.value > 9 ? "9+" : String(unreadCount.value)
 );
+const activeThreadId = ref(null);
+const justIncremented = ref(false);
 
-let unsubscribeNotice = null;
+let unsubUserQueue = null;
+let unsubFallback = null;
+let myId = null;
 
-// 1) get the true unread total from backend
+function bumpBadge() {
+  unreadCount.value = Math.min(99, unreadCount.value + 1);
+  justIncremented.value = false;
+  requestAnimationFrame(() => (justIncremented.value = true));
+  setTimeout(() => (justIncremented.value = false), 800);
+}
+
 async function fetchUnread() {
   try {
     const { data } = await api.get("/messages/threads");
@@ -83,31 +103,40 @@ async function fetchUnread() {
   }
 }
 
-// 2) live notices (only increment if it's NOT the thread you're currently viewing)
-async function startNoticeListener() {
+async function startNoticeListeners() {
   await connect();
-  unsubscribeNotice = await subscribeJson(
-    "/user/queue/notifications",
-    (notice) => {
-      if (!notice) return;
-      if (notice.type === "NEW_MESSAGE") {
+
+  // 1) per-user queue (only if a WebSocket Principal exists)
+  unsubUserQueue = await subscribeJson("/user/queue/notice", (notice) => {
+    if (!notice || notice.type !== "MESSAGE") return;
+    const tid = Number(notice.threadId);
+    if (activeThreadId.value && Number(activeThreadId.value) === tid) return;
+    bumpBadge();
+  });
+
+  // 2) public fallback topic using *real* user id from backend
+  if (!myId) {
+    const { data } = await api.get("/me");
+    myId = data?.id;
+  }
+  if (myId) {
+    unsubFallback = await subscribeJson(
+      `/topic/notice.user-${myId}`,
+      (notice) => {
+        if (!notice || notice.type !== "MESSAGE") return;
         const tid = Number(notice.threadId);
-        if (activeThreadId.value && Number(activeThreadId.value) === tid) {
-          // user is viewing this thread; Messages.vue will mark it read and cause a refresh
+        if (activeThreadId.value && Number(activeThreadId.value) === tid)
           return;
-        }
-        unreadCount.value = Math.min(99, unreadCount.value + 1);
+        bumpBadge();
       }
-    }
-  );
+    );
+  }
 }
 
 function openMessages() {
-  // just navigate; do NOT forcibly clear the badge here
   router.push({ path: "/messages" });
 }
 
-// 3) listen for cross-component events
 function onActiveThread(e) {
   activeThreadId.value = e?.detail ?? null;
 }
@@ -117,14 +146,13 @@ function onUnreadRefresh() {
 
 onMounted(async () => {
   await fetchUnread();
-  await startNoticeListener();
-
+  await startNoticeListeners();
   window.addEventListener("sb-active-thread", onActiveThread);
   window.addEventListener("sb-unread-refresh", onUnreadRefresh);
 });
-
 onBeforeUnmount(() => {
-  if (unsubscribeNotice) unsubscribeNotice();
+  if (unsubUserQueue) unsubUserQueue();
+  if (unsubFallback) unsubFallback();
   window.removeEventListener("sb-active-thread", onActiveThread);
   window.removeEventListener("sb-unread-refresh", onUnreadRefresh);
 });
@@ -132,8 +160,8 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .navbar {
-  background: white;
-  border-bottom: 1px solid #ddd;
+  background: #fff;
+  border-bottom: 1px solid #e6e6e6;
   width: 100%;
 }
 .navbar-container {
@@ -143,7 +171,6 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: center;
 }
-
 .left {
   display: flex;
   align-items: center;
@@ -154,10 +181,9 @@ onBeforeUnmount(() => {
 }
 .brand {
   color: #1b9536;
-  font-weight: bold;
+  font-weight: 800;
   font-size: 2rem;
 }
-
 .nav-links {
   display: flex;
   gap: 2rem;
@@ -168,8 +194,8 @@ onBeforeUnmount(() => {
 .nav-link {
   text-decoration: none;
   color: #1b9536;
-  font-weight: 600;
-  font-size: 1.3rem;
+  font-weight: 700;
+  font-size: 1.15rem;
 }
 .nav-link:hover {
   text-decoration: underline;
@@ -177,42 +203,67 @@ onBeforeUnmount(() => {
 :deep(.active-link) {
   color: #0b5e1f !important;
 }
-
 .right-icons {
   display: flex;
-  gap: 1.5rem;
-  color: #1b9536;
+  gap: 1rem;
+  align-items: center;
 }
 
-/* Bigger bell */
 .bell {
   position: relative;
-  background: transparent;
-  border: 0;
-  padding: 4px;
+  background: #f4fff7;
+  border: 1px solid #bfe7cc;
+  color: #139a41;
+  padding: 6px;
+  border-radius: 12px;
   cursor: pointer;
   line-height: 1;
+  transition: box-shadow 0.2s ease;
 }
-.nav-icon {
-  pointer-events: none;
-  font-size: 26px; /* <- bigger */
+.bell:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+.bell-svg {
+  display: block;
+}
+.bell-svg.ring {
+  animation: ring 0.8s ease;
+}
+@keyframes ring {
+  0% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(-12deg);
+  }
+  40% {
+    transform: rotate(10deg);
+  }
+  60% {
+    transform: rotate(-8deg);
+  }
+  80% {
+    transform: rotate(6deg);
+  }
+  100% {
+    transform: rotate(0);
+  }
 }
 
-/* Badge */
 .badge {
   position: absolute;
-  top: -4px;
-  right: -8px;
+  top: -6px;
+  right: -6px;
   min-width: 18px;
   height: 18px;
   padding: 0 4px;
   background: #e03131;
   color: #fff;
   border-radius: 999px;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 800;
   line-height: 18px;
   text-align: center;
-  box-shadow: 0 0 0 2px #fff; /* small border for contrast */
+  box-shadow: 0 0 0 2px #fff;
 }
 </style>

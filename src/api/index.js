@@ -1,12 +1,10 @@
-// src/api/index.js
 import axios from "axios";
 import router from "@/router";
 
 const api = axios.create({
-  baseURL: "/api/v1", // or: import.meta.env.VITE_API_BASE + "/api/v1"
+  baseURL: "/api/v1", 
 });
 
-// Endpoints that must be PUBLIC (no auth header)
 const PUBLIC_SUFFIXES = [
   "/authenticate",      // POST register/login token
   "/room-finder",       // POST registration

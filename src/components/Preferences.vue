@@ -8,22 +8,58 @@
         <label class="heading">Preferred Gender</label>
         <div class="radio-group vertical">
           <label class="select">
-            <input type="radio" name="gender" value="any" v-model="preferences.gender" /> Any
+            <input
+              type="radio"
+              name="gender"
+              value="any"
+              v-model="preferences.gender"
+            />
+            Any
           </label>
           <label class="select">
-            <input type="radio" name="gender" value="male" v-model="preferences.gender" /> Male
+            <input
+              type="radio"
+              name="gender"
+              value="male"
+              v-model="preferences.gender"
+            />
+            Male
           </label>
           <label class="select">
-            <input type="radio" name="gender" value="female" v-model="preferences.gender" /> Female
+            <input
+              type="radio"
+              name="gender"
+              value="female"
+              v-model="preferences.gender"
+            />
+            Female
           </label>
           <label class="select">
-            <input type="radio" name="gender" value="nonbinary" v-model="preferences.gender" /> Non-Binary
+            <input
+              type="radio"
+              name="gender"
+              value="nonbinary"
+              v-model="preferences.gender"
+            />
+            Non-Binary
           </label>
           <label class="select">
-            <input type="radio" name="gender" value="other" v-model="preferences.gender" /> Other
+            <input
+              type="radio"
+              name="gender"
+              value="other"
+              v-model="preferences.gender"
+            />
+            Other
           </label>
           <label class="select">
-            <input type="radio" name="gender" value="preferNotToSay" v-model="preferences.gender" /> Prefer not to say
+            <input
+              type="radio"
+              name="gender"
+              value="preferNotToSay"
+              v-model="preferences.gender"
+            />
+            Prefer not to say
           </label>
         </div>
       </div>
@@ -31,14 +67,26 @@
       <div class="field-box">
         <label class="heading">Age Range</label>
         <div class="input-row">
-          <input type="number" placeholder="Min Age" v-model="preferences.minAge" />
-          <input type="number" placeholder="Max Age" v-model="preferences.maxAge" />
+          <input
+            type="number"
+            placeholder="Min Age"
+            v-model="preferences.minAge"
+          />
+          <input
+            type="number"
+            placeholder="Max Age"
+            v-model="preferences.maxAge"
+          />
         </div>
       </div>
 
       <div class="field-box">
         <label class="heading">Budget Range (per month)</label>
-        <input type="text" placeholder="e.g. $500 - $700" v-model="preferences.budgetRange" />
+        <input
+          type="text"
+          placeholder="e.g. $500 - $700"
+          v-model="preferences.budgetRange"
+        />
       </div>
 
       <div class="field-box">
@@ -67,25 +115,48 @@
 
       <div class="field-box">
         <label class="heading">Preferred Location</label>
-        <input type="text" placeholder="e.g. University District" v-model="preferences.preferredLocation" />
+        <input
+          type="text"
+          placeholder="e.g. University District"
+          v-model="preferences.preferredLocation"
+        />
       </div>
 
       <div class="field-box">
         <label class="heading">Maximum Distance from Campus (km)</label>
-        <input type="number" placeholder="Distance in km" v-model="preferences.maxDistance" />
+        <input
+          type="number"
+          placeholder="Distance in km"
+          v-model="preferences.maxDistance"
+        />
       </div>
 
       <div class="field-box">
         <label class="heading">Transportation Preferences</label>
         <div class="checkbox-group vertical">
           <label class="select">
-            <input type="checkbox" value="publicTransport" v-model="preferences.transportation" /> Near public transportation
+            <input
+              type="checkbox"
+              value="publicTransport"
+              v-model="preferences.transportation"
+            />
+            Near public transportation
           </label>
           <label class="select">
-            <input type="checkbox" value="walking" v-model="preferences.transportation" /> Walking distance to campus
+            <input
+              type="checkbox"
+              value="walking"
+              v-model="preferences.transportation"
+            />
+            Walking distance to campus
           </label>
           <label class="select">
-            <input type="checkbox" value="ownTransport" v-model="preferences.transportation" /> Own transportation available
+            <input
+              type="checkbox"
+              value="ownTransport"
+              v-model="preferences.transportation"
+            />
+            Own transportation available
           </label>
         </div>
       </div>
@@ -117,7 +188,6 @@ export default {
     savePreferences() {
       console.log("Preferences saved:", this.preferences);
       alert("Preferences saved successfully!");
-      // Here you could POST to an API endpoint if needed
     },
   },
 };

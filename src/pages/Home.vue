@@ -29,9 +29,10 @@
           </p>
           <div class="cta-row">
             <button class="btn primary" @click="goQuiz">Take the Quiz</button>
-            <router-link class="btn ghost" to="/browse">
-              Browse Listings
-            </router-link>
+            <!-- changed: Browse -> Go To Dashboard with auth gate -->
+            <button class="btn ghost" @click="goDashboard">
+              Go To Dashboard
+            </button>
           </div>
         </div>
 
@@ -180,6 +181,15 @@ function goQuiz() {
     : router.push({ path: "/login", query: { redirect: "/quiz" } });
 }
 
+/* NEW: gated dashboard navigation */
+function goDashboard() {
+  if (isAuthed.value) {
+    router.push("/dashboard");
+  } else {
+    router.push({ path: "/login", query: { redirect: "/dashboard" } });
+  }
+}
+
 /* ---------- featured listings ---------- */
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
 const listings = reactive([]);
@@ -191,12 +201,12 @@ function absUrl(u) {
   if (/^https?:\/\//i.test(u)) return u;
   return `${API_BASE}${u.startsWith("/") ? "" : "/"}${u}`;
 }
+
+/* STATIC S3 PHOTOS: no timestamp / no changing query string */
 function thumbStyle(url) {
   if (!url) return {};
   const u = absUrl(url);
-  return {
-    backgroundImage: `url("${u}${u.includes("?") ? "&" : "?"}t=${Date.now()}")`,
-  };
+  return { backgroundImage: `url("${u}")` };
 }
 
 async function fetchFeatured() {
@@ -236,69 +246,75 @@ onBeforeUnmount(() => {
   window.removeEventListener("focus", refreshAuth);
 });
 
+/* ---------- hero slider (autoplay) ---------- */
 const images = ref([
-  { src: '/images/finding-roomate-2.jpg', alt: 'Group studying in living room' },
-  { src: '/images/image1.jpg',       alt: 'Roommates chatting' },
-  { src: '/images/image2.jpg',       alt: 'Kitchen hangout' },
-  { src: '/images/image3.jpg',       alt: 'Shared workspace' },
-  { src: '/images/image4.jpg',       alt: 'Movie night' },
-])
+  {
+    src: "/images/finding-roomate-2.jpg",
+    alt: "Group studying in living room",
+  },
+  { src: "/images/image1.jpg", alt: "Roommates chatting" },
+  { src: "/images/image2.jpg", alt: "Kitchen hangout" },
+  { src: "/images/image3.jpg", alt: "Shared workspace" },
+  { src: "/images/image4.jpg", alt: "Movie night" },
+]);
 
-const index = ref(0)
-const intervalMs = 2000
-let timer = null
-
-
+const index = ref(0);
+const intervalMs = 2000;
+let timer = null;
 
 const trackStyle = computed(() => ({
-  transform: `translateX(-${index.value * 100}%)`
-}))
+  transform: `translateX(-${index.value * 100}%)`,
+}));
 
-function next()   { index.value = (index.value + 1) % images.value.length }
-function prev()   { index.value = (index.value - 1 + images.value.length) % images.value.length }
-function go(i) { index.value = i }
+function next() {
+  index.value = (index.value + 1) % images.value.length;
+}
+function prev() {
+  index.value = (index.value - 1 + images.value.length) % images.value.length;
+}
+function go(i) {
+  index.value = i;
+}
 
-const autoplay = true
+const autoplay = true;
 
 function start() {
-  stop()
-  if (!autoplay || images.value.length <= 1) return
-  timer = window.setInterval(next, intervalMs)
+  stop();
+  if (!autoplay || images.value.length <= 1) return;
+  timer = window.setInterval(next, intervalMs);
 }
 function stop() {
   if (timer !== null) {
-    clearInterval(timer)
-    timer = null
+    clearInterval(timer);
+    timer = null;
   }
 }
-function pause()  { stop() }
-function resume() { start() }
+function pause() {
+  stop();
+}
+function resume() {
+  start();
+}
 
 // pause when tab hidden, resume when visible
 function handleVisibility() {
-  if (document.hidden) stop()
-  else start()
+  if (document.hidden) stop();
+  else start();
 }
 
 onMounted(() => {
-  start()
-  document.addEventListener('visibilitychange', handleVisibility)
-  window.addEventListener('blur', stop)     // optional: pause when switching apps
-  window.addEventListener('focus', start)   // optional: resume on focus
-})
+  start();
+  document.addEventListener("visibilitychange", handleVisibility);
+  window.addEventListener("blur", stop); // optional: pause when switching apps
+  window.addEventListener("focus", start); // optional: resume on focus
+});
 onBeforeUnmount(() => {
-  stop()
-  document.removeEventListener('visibilitychange', handleVisibility)
-  window.removeEventListener('blur', stop)
-  window.removeEventListener('focus', start)
-})
-
-
+  stop();
+  document.removeEventListener("visibilitychange", handleVisibility);
+  window.removeEventListener("blur", stop);
+  window.removeEventListener("focus", start);
+});
 </script>
-
-<style scoped>
-/* (unchanged styles)… */
-</style>
 
 <style scoped>
 /* HEADER (navbar + auth on one line) */
@@ -408,6 +424,7 @@ onBeforeUnmount(() => {
   border: 1px solid #cbe8d2;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
 }
+
 /* HERO SLIDER */
 .hero-art {
   position: relative;
@@ -419,7 +436,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   border-radius: 16px;
   border: 1px solid #cbe8d2;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
   /* Keep same visual size as before */
   max-height: 400px;
 }
@@ -429,7 +446,7 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   transition: transform 600ms ease;
-  will-change: transform;           /* GPU accelerated */
+  will-change: transform; /* GPU accelerated */
 }
 
 .slide {
@@ -452,35 +469,45 @@ onBeforeUnmount(() => {
   top: 50%;
   transform: translateY(-50%);
   border: none;
-  background: rgba(255,255,255,0.8);
+  background: rgba(255, 255, 255, 0.8);
   padding: 0.4rem 0.6rem;
   border-radius: 999px;
   cursor: pointer;
   font-size: 1.2rem;
   line-height: 1;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
-.nav:hover { background: #fff; }
-.nav.prev { left: 10px; }
-.nav.next { right: 10px; }
+.nav:hover {
+  background: #fff;
+}
+.nav.prev {
+  left: 10px;
+}
+.nav.next {
+  right: 10px;
+}
 
 /* Dots */
 .dots {
   position: absolute;
-  left: 0; right: 0; bottom: 10px;
+  left: 0;
+  right: 0;
+  bottom: 10px;
   display: flex;
   justify-content: center;
   gap: 8px;
 }
 .dot {
-  width: 8px; height: 8px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.7);
-  border: 1px solid rgba(0,0,0,0.08);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   cursor: pointer;
 }
-.dot.active { background: #1b9536; }
-
+.dot.active {
+  background: #1b9536;
+}
 
 .section {
   padding: 1.6rem 0 2.6rem;
@@ -538,7 +565,7 @@ onBeforeUnmount(() => {
   margin-top: auto;
 }
 
-/* buttons (keep your palette) */
+/* buttons */
 .btn {
   display: inline-flex;
   align-items: center;

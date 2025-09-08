@@ -8,7 +8,6 @@
     <div v-if="error" class="error">{{ error }}</div>
 
     <div v-if="!loading && !error && profile" class="card">
-      <!-- HERO: big photo on the left, details on the right -->
       <div class="hero-grid">
         <div class="hero-photo">
           <img v-if="photoUrl" :src="photoUrl" alt="avatar" />
@@ -61,7 +60,7 @@
 
       <!-- Why you match -->
       <div class="section">
-        <h3 class="section-title">Why You Match</h3>
+        <h3 class="section-title">Similar Preferences</h3>
         <ul v-if="(profile.whyYouMatch || []).length" class="reasons">
           <li v-for="(r, i) in profile.whyYouMatch" :key="i">{{ r }}</li>
         </ul>

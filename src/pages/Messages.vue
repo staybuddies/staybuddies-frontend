@@ -33,7 +33,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import Navbar from "@/components/Navbar.vue";
 import ConversationList from "@/components/message/ConversationList.vue";
@@ -41,6 +41,30 @@ import ChatWindow from "@/components/message/ChatWindow.vue";
 import UserDetails from "@/components/message/UserDetails.vue";
 import api from "@/api";
 import { connect, subscribeJson } from "@/ws/stomp";
+
+/* ---------------- JWT helpers (for myId) ---------------- */
+function readToken() {
+  let t =
+    localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+  t = (t || "").trim();
+  if (t.startsWith("Bearer ")) t = t.slice(7).trim();
+  if (!t || t === "null" || t === "undefined") return null;
+  return t;
+}
+function myIdFromJwt() {
+  try {
+    const t = readToken();
+    if (!t) return null;
+    const p = JSON.parse(atob(t.split(".")[1] || ""));
+    // common claim names
+    const raw = p?.uid ?? p?.id ?? p?.userId ?? p?.subId ?? p?.user_id ?? null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+const myId = ref(myIdFromJwt());
 
 /* ---------- client-side mute helpers ---------- */
 const MUTE_KEY = "sb_muted_user_ids";
@@ -72,7 +96,7 @@ function removeMute(userId) {
 const route = useRoute();
 const router = useRouter();
 
-const conversations = ref([]); // [{ id, otherId, otherName, messages: MessageDto[] }]
+const conversations = ref([]); // [{ id, otherId, otherName, lastMessage, lastTime, unread, messages: MessageDto[] }]
 const activeThreadId = ref(null);
 const loading = ref(false);
 const sending = ref(false);
@@ -92,6 +116,7 @@ async function fetchThreads() {
     conversations.value = (Array.isArray(data) ? data : []).map((c) => ({
       ...c,
       id: Number(c.id),
+      unread: Number(c.unread || 0),
       messages: c.messages ?? [],
     }));
   } catch (e) {
@@ -120,20 +145,22 @@ async function fetchMessages(threadId) {
 /* ----------------------- realtime ----------------------- */
 
 let unsubscribeThread = null;
-// --- for message icon showing the unread messages ---
+let unsubscribeNoticeA = null; // /user/queue/notice
+let unsubscribeNoticeB = null; // /topic/notice.user-{myId}
+
+/** Tell backend the thread is read, then refresh Navbar badge */
 async function markThreadRead(threadId) {
   try {
     await api.put(`/messages/threads/${threadId}/read`);
-    // Ask Navbar to refresh the unread badge
     window.dispatchEvent(new CustomEvent("sb-unread-refresh"));
   } catch (e) {
     // ignore
   }
 }
+
 /**
- * Subscribe to /topic/threads/{id}
- * Backend event shape we handle:
- *   { threadId, id, senderId, text, time }
+ * Subscribe to live events for the active thread
+ * Backend event: { type:'MESSAGE', threadId, id, senderId, text, time }
  */
 async function subscribeToThread(threadId) {
   if (unsubscribeThread) {
@@ -145,11 +172,9 @@ async function subscribeToThread(threadId) {
   unsubscribeThread = await subscribeJson(
     `/topic/threads/${threadId}`,
     async (evt) => {
-      // <-- make the handler async
       const i = conversations.value.findIndex((c) => c.id === evt.threadId);
       if (i < 0) return;
 
-      // Ignore if muted
       const otherId = conversations.value[i].otherId;
       if (isMuted(otherId)) return;
 
@@ -157,10 +182,14 @@ async function subscribeToThread(threadId) {
         conversations.value[i].messages ??
         (conversations.value[i].messages = []);
 
-      // de-dupe by message id
+      // dedupe by message id
       if (list.some((m) => m.id === evt.id)) return;
 
-      const fromMe = evt.senderId !== otherId;
+      // Determine author's side
+      const fromMe =
+        myId.value != null
+          ? evt.senderId === myId.value
+          : evt.senderId !== otherId;
 
       list.push({
         id: evt.id,
@@ -172,18 +201,68 @@ async function subscribeToThread(threadId) {
       conversations.value[i].lastMessage = evt.text;
       conversations.value[i].lastTime = evt.time;
 
+      // move this conversation to top by lastTime
+      const [c] = conversations.value.splice(i, 1);
+      conversations.value.unshift(c);
+
       if (activeThreadId.value !== evt.threadId) {
-        conversations.value[i].unread =
-          (conversations.value[i].unread ?? 0) + 1;
+        // shouldn't happen for this subscription, but guard anyway
+        conversations.value[0].unread =
+          (conversations.value[0].unread ?? 0) + 1;
+        window.dispatchEvent(new CustomEvent("sb-unread-refresh"));
       } else {
-        // I'm viewing this thread → mark as read on server & refresh Navbar badge
+        await nextTick();
         await markThreadRead(evt.threadId);
       }
     }
   );
 }
 
+/**
+ * Global notice listeners -> increments unread for other threads
+ * Backend notice: { type:'MESSAGE', threadId }
+ */
+async function startGlobalNoticeListeners() {
+  await connect();
+
+  // per-user queue (works if Principal is set on WS)
+  unsubscribeNoticeA = await subscribeJson("/user/queue/notice", onNotice);
+
+  // fallback topic by numeric user id (works even without WS Principal)
+  if (myId.value != null) {
+    unsubscribeNoticeB = await subscribeJson(
+      `/topic/notice.user-${myId.value}`,
+      onNotice
+    );
+  }
+}
+
+function onNotice(notice) {
+  if (!notice || String(notice.type).toUpperCase() !== "MESSAGE") return;
+  const tid = Number(notice.threadId);
+  if (!tid) return;
+
+  // If I'm currently looking at that thread, Messages.vue will mark it read via thread stream
+  if (activeThreadId.value && Number(activeThreadId.value) === tid) return;
+
+  const i = conversations.value.findIndex((c) => c.id === tid);
+  if (i >= 0) {
+    conversations.value[i].unread =
+      Number(conversations.value[i].unread || 0) + 1;
+    // move to top visually (most recent)
+    const [c] = conversations.value.splice(i, 1);
+    conversations.value.unshift(c);
+  } else {
+    // thread not in list (new conversation) -> refresh list
+    fetchThreads();
+  }
+
+  // tell Navbar to refresh its badge
+  window.dispatchEvent(new CustomEvent("sb-unread-refresh"));
+}
+
 /* ----------------------- UX actions ----------------------- */
+
 async function sendMessage(text) {
   const body = text?.trim();
   if (!body || !activeThreadId.value) return;
@@ -197,7 +276,7 @@ async function sendMessage(text) {
       { content: body }
     );
 
-    // Optimistic local add (guard against duplicate when websocket echo arrives)
+    // Optimistic local add (de-dupe later)
     const idx = conversations.value.findIndex(
       (c) => c.id === activeThreadId.value
     );
@@ -208,7 +287,7 @@ async function sendMessage(text) {
 
       if (!list.some((m) => m.id === data?.id)) {
         list.push({
-          id: data?.id ?? Date.now(), // fallback id just in case
+          id: data?.id ?? Date.now(),
           fromMe: true,
           text: data?.text ?? body,
           time: data?.time ?? new Date().toISOString(),
@@ -216,12 +295,15 @@ async function sendMessage(text) {
         conversations.value[idx].lastMessage = data?.text ?? body;
         conversations.value[idx].lastTime =
           data?.time ?? new Date().toISOString();
+
+        // move to top
+        const [c] = conversations.value.splice(idx, 1);
+        conversations.value.unshift(c);
       }
     }
-    // Since I'm on this thread, no unread bump needed; nothing else to do.
   } catch (e) {
-    // Handle “canonical thread” merge if your backend returns 409
     if (e?.response?.status === 409) {
+      // canonical thread reconciliation
       const serverOther = e.response?.data?.withUserId;
       const localOther = activeConversation.value?.otherId;
       const otherId = serverOther ?? localOther;
@@ -264,33 +346,24 @@ async function openThread(threadId) {
     new CustomEvent("sb-active-thread", { detail: activeThreadId.value })
   );
 
-  // set local unread to 0 for this conversation (UI), then mark read on server (source of truth)
+  // set local unread to 0 (UI) and mark read on server
   const idx = conversations.value.findIndex(
     (c) => c.id === activeThreadId.value
   );
   if (idx >= 0) conversations.value[idx].unread = 0;
 
+  await nextTick();
   await markThreadRead(activeThreadId.value);
 }
 
 /* ----------------------- Profile / Block ----------------------- */
 
-/**
- * View Profile:
- * Go to the public profile page of the other user.
- * Requires route: { path: '/users/:id', name: 'public-profile', component: ... }
- */
 function viewProfile() {
   const otherId = activeConversation.value?.otherId;
   if (!otherId) return;
   router.push({ name: "public-profile", params: { id: String(otherId) } });
 }
 
-/**
- * Block (client-side "mute"):
- * Adds the user to a localStorage set and removes the conversation.
- * 👉 When you add a real backend block, call it where marked.
- */
 async function blockUser(passedId) {
   const otherId = Number(passedId ?? activeConversation.value?.otherId);
   if (!otherId) return;
@@ -300,9 +373,7 @@ async function blockUser(passedId) {
     return;
 
   try {
-    // 👉 UPGRADE HERE if you add a backend block endpoint:
-    // await api.post(`/blocks/${otherId}`);
-
+    // If you add a real backend block, call it here
     addMute(otherId);
 
     // Remove the conversation locally
@@ -334,6 +405,7 @@ async function blockUser(passedId) {
 async function init() {
   await fetchThreads();
   await connect();
+  await startGlobalNoticeListeners();
 
   const threadQ = route.query.thread ? Number(route.query.thread) : null;
   const withQ = route.query.with ? Number(route.query.with) : null;
@@ -359,6 +431,8 @@ async function init() {
 onMounted(init);
 onBeforeUnmount(() => {
   if (unsubscribeThread) unsubscribeThread();
+  if (unsubscribeNoticeA) unsubscribeNoticeA();
+  if (unsubscribeNoticeB) unsubscribeNoticeB();
   window.dispatchEvent(new CustomEvent("sb-active-thread", { detail: null })); // clear hint for Navbar
 });
 </script>
