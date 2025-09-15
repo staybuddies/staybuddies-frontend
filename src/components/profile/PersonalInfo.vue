@@ -110,15 +110,7 @@
           <input type="checkbox" v-model="form.alreadyHasRoom" />
           Already have a room
         </label>
-
-        <label>
-          Change Password (optional)
-          <input
-            v-model="password"
-            type="password"
-            placeholder="New password"
-          />
-        </label>
+        <!-- Removed Change Password field -->
       </div>
 
       <button class="primary">Save Changes</button>
@@ -132,7 +124,6 @@ import api from "@/api";
 
 const loading = ref(true);
 const error = ref("");
-const password = ref("");
 
 const form = reactive({
   id: null,
@@ -219,9 +210,8 @@ async function savePersonal() {
       major: form.major,
       bio: form.bio,
       alreadyHasRoom: form.alreadyHasRoom,
-      password: password.value || null,
+      // password removed
     });
-    password.value = "";
     await fetchProfile();
     alert("Saved.");
   } catch (e) {

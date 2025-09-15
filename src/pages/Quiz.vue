@@ -8,7 +8,6 @@
     </div>
 
     <p>Question {{ currentQuestionIndex + 1 }} of {{ questions.length }}</p>
-
     <div class="question-card">
       <h2>{{ current.question }}</h2>
       <p class="subtitle">{{ current.subtitle }}</p>
@@ -27,18 +26,29 @@
     </div>
 
     <div class="buttons">
-      <button @click="prevQuestion" :disabled="currentQuestionIndex === 0">
+      <button
+        type="button"
+        class="btn btn--outline"
+        @click="prevQuestion"
+        :disabled="currentQuestionIndex === 0"
+      >
         ← Previous
       </button>
+
       <button
         v-if="currentQuestionIndex < questions.length - 1"
+        type="button"
+        class="btn btn--solid"
         @click="nextQuestion"
         :disabled="!answers[currentQuestionIndex]"
       >
         Next →
       </button>
+
       <button
         v-else
+        type="button"
+        class="btn btn--solid"
         @click="submitQuiz"
         :disabled="!answers[currentQuestionIndex]"
       >
@@ -63,6 +73,7 @@ const error = ref("");
 const success = ref(false);
 
 const questions = ref([
+  // 1) Bedtime
   {
     question: "What time do you typically go to bed on weeknights?",
     subtitle: "Select the option that best describes you.",
@@ -73,6 +84,7 @@ const questions = ref([
       { text: "After 2 AM", weight: 1 },
     ],
   },
+  // 2) Cleanliness
   {
     question: "How tidy do you keep shared spaces?",
     subtitle: "1 = messy, 5 = very tidy",
@@ -84,6 +96,7 @@ const questions = ref([
       { text: "Messy", weight: 1 },
     ],
   },
+  // 3) Noise sensitivity
   {
     question: "How sensitive are you to noise at night?",
     subtitle: "Higher score = prefers quieter home",
@@ -95,6 +108,7 @@ const questions = ref([
       { text: "Not sensitive", weight: 1 },
     ],
   },
+  // 4) Guests
   {
     question: "How often do you have guests over?",
     subtitle: "Higher score = fewer guests",
@@ -106,6 +120,7 @@ const questions = ref([
       { text: "Most days", weight: 1 },
     ],
   },
+  // 5) Pets
   {
     question: "Are you okay living with pets?",
     subtitle: "Pet friendliness",
@@ -117,6 +132,7 @@ const questions = ref([
       { text: "Allergic / No pets", weight: 1 },
     ],
   },
+  // 6) Smoking tolerance
   {
     question: "Smoking tolerance at home?",
     subtitle: "Higher score = less tolerant",
@@ -128,17 +144,20 @@ const questions = ref([
       { text: "Don’t care", weight: 1 },
     ],
   },
+  // 7) Budget flexibility (keep as-is if you like)
   {
-    question: "Budget flexibility for rent?",
-    subtitle: "Higher score = more flexible",
+    question:
+      "How comfortable are you discussing issues directly with a roommate?",
+    subtitle: "Higher score = more open communicator",
     options: [
-      { text: "Very flexible", weight: 5 },
-      { text: "Somewhat flexible", weight: 4 },
-      { text: "Average", weight: 3 },
-      { text: "Tight budget", weight: 2 },
-      { text: "Very tight", weight: 1 },
+      { text: "Very comfortable and proactive", weight: 5 },
+      { text: "Comfortable with respectful talks", weight: 4 },
+      { text: "Neutral / depends on the issue", weight: 3 },
+      { text: "Prefer to avoid confrontation", weight: 2 },
+      { text: "Avoid discussing issues directly", weight: 1 },
     ],
   },
+  // 8) Work/Study alignment importance (keep as-is)
   {
     question: "Work/Study schedule alignment importance?",
     subtitle: "Higher score = very important",
@@ -150,26 +169,28 @@ const questions = ref([
       { text: "Doesn’t matter", weight: 1 },
     ],
   },
+  // 9) NEW — Rent budget (THB)
   {
-    question: "Morning vs. night person?",
-    subtitle: "Higher = morning person",
+    question: "What monthly rent budget can you afford (THB)?",
+    subtitle: "Pick the closest bracket in Thai baht (THB).",
     options: [
-      { text: "Strong morning person", weight: 5 },
-      { text: "Slightly morning", weight: 4 },
-      { text: "Neither", weight: 3 },
-      { text: "Slightly night", weight: 2 },
-      { text: "Strong night owl", weight: 1 },
+      { text: "≤ 4,000 THB", weight: 1 },
+      { text: "4,001 – 6,000 THB", weight: 2 },
+      { text: "6,001 – 8,000 THB", weight: 3 },
+      { text: "8,001 – 10,000 THB", weight: 4 },
+      { text: "> 10,000 THB", weight: 5 },
     ],
   },
+  // 10) NEW — Nationality / region
   {
-    question: "How often do you cook at home?",
-    subtitle: "Higher score = less cooking",
+    question: "What is your nationality / region group?",
+    subtitle: "Used only for matching preferences.",
     options: [
-      { text: "Rarely cook", weight: 5 },
-      { text: "1–2x/week", weight: 4 },
-      { text: "3–4x/week", weight: 3 },
-      { text: "Most days", weight: 2 },
-      { text: "Every day", weight: 1 },
+      { text: "Thai", weight: 1 },
+      { text: "ASEAN (non-Thai)", weight: 2 },
+      { text: "East/South Asia", weight: 3 },
+      { text: "Europe/Americas/Oceania", weight: 4 },
+      { text: "Other / Prefer not to say", weight: 5 },
     ],
   },
 ]);
@@ -194,7 +215,6 @@ async function loadExisting() {
   try {
     const { data } = await api.get("/room-finder/me/quiz");
     if (Array.isArray(data.answers) && data.answers.length === 10) {
-      // Fill selections by matching weights to the closest option
       answers.value = data.answers.map((w, idx) => {
         return questions.value[idx].options.find((o) => o.weight === w) ?? null;
       });
@@ -208,7 +228,6 @@ async function submitQuiz() {
   error.value = "";
   success.value = false;
 
-  // Convert selected option objects → list of weights
   const weights = answers.value.map((a) => a?.weight ?? null);
   if (weights.some((w) => w == null)) {
     error.value = "Please answer every question.";
@@ -233,6 +252,10 @@ onMounted(loadExisting);
 
 <style scoped>
 .quiz-container {
+  --green: #1b9536;
+  --green-hover: #16812d;
+  --green-tint: rgba(27, 149, 54, 0.08);
+
   max-width: 720px;
   margin: 2rem auto;
   padding: 1rem;
@@ -245,13 +268,13 @@ onMounted(loadExisting);
   margin-bottom: 0.75rem;
 }
 .progress {
-  background: #1b9536;
+  background: var(--green);
   height: 8px;
 }
 .question-card {
   background: #f0fff0;
   padding: 1rem;
-  border: 1px solid #1b9536;
+  border: 1px solid var(--green);
   border-radius: 8px;
 }
 .subtitle {
@@ -261,11 +284,71 @@ onMounted(loadExisting);
 .option {
   margin-top: 0.5rem;
 }
+
+/* Buttons layout */
 .buttons {
   display: flex;
   justify-content: space-between;
+  gap: 0.75rem;
   margin-top: 1rem;
 }
+
+/* Button styles */
+.btn {
+  appearance: none;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 1rem;
+  padding: 0.75rem 1.15rem;
+  min-width: 140px;
+  cursor: pointer;
+  border: 1px solid var(--green);
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease,
+    box-shadow 0.18s ease, transform 0.02s ease;
+  line-height: 1;
+}
+
+.btn--solid {
+  background: var(--green);
+  color: #fff;
+}
+.btn--solid:hover:not(:disabled) {
+  background: var(--green-hover);
+  border-color: var(--green-hover);
+  box-shadow: 0 8px 22px rgba(27, 149, 54, 0.25);
+}
+
+.btn--outline {
+  background: #fff;
+  color: var(--green);
+}
+.btn--outline:hover:not(:disabled) {
+  background: var(--green-tint);
+  box-shadow: 0 6px 16px rgba(27, 149, 54, 0.15);
+}
+
+/* Focus & disabled */
+.btn:focus-visible {
+  outline: 3px solid rgba(27, 149, 54, 0.35);
+  outline-offset: 2px;
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Mobile: stack buttons */
+@media (max-width: 520px) {
+  .buttons {
+    flex-direction: column-reverse;
+  }
+  .btn {
+    width: 100%;
+  }
+}
+
 .error {
   color: #c92a2a;
   margin-top: 0.75rem;

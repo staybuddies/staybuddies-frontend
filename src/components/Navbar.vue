@@ -72,6 +72,16 @@ import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import api from "@/api";
 import { connect, subscribeJson } from "@/ws/stomp";
+import { startPushOnce } from "@/push";
+
+onMounted(async () => {
+  await fetchUnread();
+  await startNoticeListeners();
+  // Start web push token registration (no-op if already started)
+  startPushOnce();
+  window.addEventListener("sb-active-thread", onActiveThread);
+  window.addEventListener("sb-unread-refresh", onUnreadRefresh);
+});
 
 const router = useRouter();
 
