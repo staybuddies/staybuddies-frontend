@@ -1,6 +1,7 @@
 <template>
   <div>
     <Navbar />
+
     <div class="messages-layout">
       <ConversationList
         :conversations="conversations"
@@ -56,7 +57,6 @@ function myIdFromJwt() {
     const t = readToken();
     if (!t) return null;
     const p = JSON.parse(atob(t.split(".")[1] || ""));
-    // common claim names
     const raw = p?.uid ?? p?.id ?? p?.userId ?? p?.subId ?? p?.user_id ?? null;
     const n = Number(raw);
     return Number.isFinite(n) && n > 0 ? n : null;
@@ -147,32 +147,77 @@ async function fetchMessages(threadId) {
 let unsubscribeThread = null;
 let unsubscribeNoticeA = null; // /user/queue/notice
 let unsubscribeNoticeB = null; // /topic/notice.user-{myId}
+let heartbeatTimer = null;
 
 /** Tell backend the thread is read, then refresh Navbar badge */
 async function markThreadRead(threadId) {
   try {
     await api.put(`/messages/threads/${threadId}/read`);
     window.dispatchEvent(new CustomEvent("sb-unread-refresh"));
-  } catch (e) {
+  } catch {
     // ignore
+  }
+}
+
+/** (Re)connect and (re)subscribe if needed – idempotent */
+async function ensureWs() {
+  try {
+    await connect(); // cheap if already connected
+
+    // Global notices
+    if (!unsubscribeNoticeA) {
+      unsubscribeNoticeA = await subscribeJson("/user/queue/notice", onNotice);
+    }
+    if (myId.value != null && !unsubscribeNoticeB) {
+      unsubscribeNoticeB = await subscribeJson(
+        `/topic/notice.user-${myId.value}`,
+        onNotice
+      );
+    }
+
+    // Active thread subscription
+    if (activeThreadId.value && !unsubscribeThread) {
+      await subscribeToThread(activeThreadId.value);
+    }
+  } catch {
+    // will retry via heartbeat
+  }
+}
+
+/** Heartbeat to recover from iOS Safari background sleep and stale sockets */
+function startWsHeartbeat() {
+  stopWsHeartbeat();
+  heartbeatTimer = window.setInterval(async () => {
+    await ensureWs();
+  }, 15000);
+}
+function stopWsHeartbeat() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
   }
 }
 
 /**
  * Subscribe to live events for the active thread
- * Backend event: { type:'MESSAGE', threadId, id, senderId, text, time }
+ * We RELY on the subscribed thread id (tid), not evt.threadId.
  */
 async function subscribeToThread(threadId) {
+  const tid = Number(threadId);
+
   if (unsubscribeThread) {
-    unsubscribeThread();
+    try {
+      unsubscribeThread();
+    } catch {}
     unsubscribeThread = null;
   }
   await connect();
 
   unsubscribeThread = await subscribeJson(
-    `/topic/threads/${threadId}`,
+    `/topic/threads/${tid}`,
     async (evt) => {
-      const i = conversations.value.findIndex((c) => c.id === evt.threadId);
+      // Find the conversation by the subscribed id
+      const i = conversations.value.findIndex((c) => c.id === tid);
       if (i < 0) return;
 
       const otherId = conversations.value[i].otherId;
@@ -182,37 +227,37 @@ async function subscribeToThread(threadId) {
         conversations.value[i].messages ??
         (conversations.value[i].messages = []);
 
-      // dedupe by message id
-      if (list.some((m) => m.id === evt.id)) return;
+      // dedupe by message id if server provides it
+      if (evt?.id && list.some((m) => m.id === evt.id)) return;
 
-      // Determine author's side
+      // normalize server fields: prefer text, fallback to body
+      const text = evt?.text ?? evt?.body ?? "";
+      const iso = evt?.time ?? new Date().toISOString();
+
+      // Determine author
       const fromMe =
         myId.value != null
-          ? evt.senderId === myId.value
-          : evt.senderId !== otherId;
+          ? Number(evt?.senderId) === Number(myId.value)
+          : Number(evt?.senderId) !== Number(otherId);
 
       list.push({
-        id: evt.id,
+        id: evt?.id ?? Date.now(),
         fromMe,
-        text: evt.text,
-        time: evt.time,
+        text,
+        time: iso,
       });
 
-      conversations.value[i].lastMessage = evt.text;
-      conversations.value[i].lastTime = evt.time;
+      conversations.value[i].lastMessage = text;
+      conversations.value[i].lastTime = iso;
 
       // move this conversation to top by lastTime
       const [c] = conversations.value.splice(i, 1);
       conversations.value.unshift(c);
 
-      if (activeThreadId.value !== evt.threadId) {
-        // shouldn't happen for this subscription, but guard anyway
-        conversations.value[0].unread =
-          (conversations.value[0].unread ?? 0) + 1;
-        window.dispatchEvent(new CustomEvent("sb-unread-refresh"));
-      } else {
+      // If it's the active thread, mark read
+      if (activeThreadId.value === tid) {
         await nextTick();
-        await markThreadRead(evt.threadId);
+        await markThreadRead(tid);
       }
     }
   );
@@ -222,42 +267,25 @@ async function subscribeToThread(threadId) {
  * Global notice listeners -> increments unread for other threads
  * Backend notice: { type:'MESSAGE', threadId }
  */
-async function startGlobalNoticeListeners() {
-  await connect();
-
-  // per-user queue (works if Principal is set on WS)
-  unsubscribeNoticeA = await subscribeJson("/user/queue/notice", onNotice);
-
-  // fallback topic by numeric user id (works even without WS Principal)
-  if (myId.value != null) {
-    unsubscribeNoticeB = await subscribeJson(
-      `/topic/notice.user-${myId.value}`,
-      onNotice
-    );
-  }
-}
-
 function onNotice(notice) {
   if (!notice || String(notice.type).toUpperCase() !== "MESSAGE") return;
   const tid = Number(notice.threadId);
   if (!tid) return;
 
-  // If I'm currently looking at that thread, Messages.vue will mark it read via thread stream
+  // If I'm currently looking at that thread, thread stream will mark it read
   if (activeThreadId.value && Number(activeThreadId.value) === tid) return;
 
   const i = conversations.value.findIndex((c) => c.id === tid);
   if (i >= 0) {
     conversations.value[i].unread =
       Number(conversations.value[i].unread || 0) + 1;
-    // move to top visually (most recent)
     const [c] = conversations.value.splice(i, 1);
     conversations.value.unshift(c);
   } else {
-    // thread not in list (new conversation) -> refresh list
+    // thread not in list (new conversation)
     fetchThreads();
   }
 
-  // tell Navbar to refresh its badge
   window.dispatchEvent(new CustomEvent("sb-unread-refresh"));
 }
 
@@ -269,6 +297,9 @@ async function sendMessage(text) {
 
   try {
     sending.value = true;
+
+    // Make sure we're connected/subscribed (helps after iOS resume)
+    await ensureWs();
 
     // POST to server
     const { data } = await api.post(
@@ -327,6 +358,10 @@ async function sendMessage(text) {
 
 async function openThread(threadId) {
   if (!threadId) return;
+
+  // connect first (important for iOS Safari)
+  await ensureWs();
+
   activeThreadId.value = Number(threadId);
 
   const convo = conversations.value.find((c) => c.id === activeThreadId.value);
@@ -341,7 +376,7 @@ async function openThread(threadId) {
 
   await subscribeToThread(activeThreadId.value);
 
-  // tell Navbar which thread is active (so it won't increment on pushes for this one)
+  // tell Navbar which thread is active
   window.dispatchEvent(
     new CustomEvent("sb-active-thread", { detail: activeThreadId.value })
   );
@@ -373,7 +408,7 @@ async function blockUser(passedId) {
     return;
 
   try {
-    // If you add a real backend block, call it here
+    // client-side mute
     addMute(otherId);
 
     // Remove the conversation locally
@@ -400,12 +435,22 @@ async function blockUser(passedId) {
   }
 }
 
-/* ----------------------- init ----------------------- */
+/* ----------------------- init + lifecycle ----------------------- */
 
 async function init() {
+  await connect(); // 1) socket ready
+  startWsHeartbeat(); // 2) keep-alive / reattach loop
+
+  // Notices after connect
+  if (!unsubscribeNoticeA)
+    unsubscribeNoticeA = await subscribeJson("/user/queue/notice", onNotice);
+  if (myId.value != null && !unsubscribeNoticeB)
+    unsubscribeNoticeB = await subscribeJson(
+      `/topic/notice.user-${myId.value}`,
+      onNotice
+    );
+
   await fetchThreads();
-  await connect();
-  await startGlobalNoticeListeners();
 
   const threadQ = route.query.thread ? Number(route.query.thread) : null;
   const withQ = route.query.with ? Number(route.query.with) : null;
@@ -428,12 +473,32 @@ async function init() {
   }
 }
 
-onMounted(init);
+function handleVisibility() {
+  if (!document.hidden) ensureWs();
+}
+function handlePageShow() {
+  ensureWs();
+}
+function handleOnline() {
+  ensureWs();
+}
+
+onMounted(() => {
+  init();
+  document.addEventListener("visibilitychange", handleVisibility);
+  window.addEventListener("pageshow", handlePageShow);
+  window.addEventListener("online", handleOnline);
+});
+
 onBeforeUnmount(() => {
   if (unsubscribeThread) unsubscribeThread();
   if (unsubscribeNoticeA) unsubscribeNoticeA();
   if (unsubscribeNoticeB) unsubscribeNoticeB();
-  window.dispatchEvent(new CustomEvent("sb-active-thread", { detail: null })); // clear hint for Navbar
+  stopWsHeartbeat();
+  document.removeEventListener("visibilitychange", handleVisibility);
+  window.removeEventListener("pageshow", handlePageShow);
+  window.removeEventListener("online", handleOnline);
+  window.dispatchEvent(new CustomEvent("sb-active-thread", { detail: null }));
 });
 </script>
 

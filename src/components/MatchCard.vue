@@ -21,7 +21,10 @@
     <div class="actions">
       <router-link
         class="btn-secondary"
-        :to="{ name: 'public-profile', params: { id: String(match.userId) } }"
+        :to="{
+          name: 'roomfinder-public',
+          params: { id: String(match.userId) },
+        }"
         title="View profile"
       >
         View Profile
@@ -57,7 +60,7 @@ import { computed } from "vue";
 import { useRouter } from "vue-router";
 
 const props = defineProps({
-  match: { type: Object, required: true }, // { userId, name, age, gender, location, compatibility, relationStatus, requestId?, threadId? }
+  match: { type: Object, required: true },
 });
 
 const router = useRouter();

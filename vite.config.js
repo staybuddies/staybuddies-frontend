@@ -1,73 +1,73 @@
-import { fileURLToPath, URL } from 'node:url'
-import { defineConfig, loadEnv } from 'vite'
-import vue from '@vitejs/plugin-vue'
+import { fileURLToPath, URL } from "node:url";
+import { defineConfig, loadEnv } from "vite";
+import vue from "@vitejs/plugin-vue";
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
-  const apiBase = env.VITE_API_BASE || 'http://localhost:8080'
+  const env = loadEnv(mode, process.cwd(), "");
+  const apiBase = env.VITE_API_BASE || "http://localhost:8080";
+  const hmrHost = env.VITE_HMR_HOST || undefined; // e.g. 192.168.1.50
 
   return {
     plugins: [vue()],
 
     resolve: {
       alias: {
-        '@': fileURLToPath(new URL('./src', import.meta.url)),
-        buffer: 'buffer', // light polyfill some libs expect
+        "@": fileURLToPath(new URL("./src", import.meta.url)),
+        buffer: "buffer",
       },
     },
 
     define: {
-      global: 'window',      // some libs expect a global
-      'process.env': {},     // silence process.env reads
+      global: "window",
+      "process.env": {},
     },
 
     optimizeDeps: {
-      include: ['@stomp/stompjs', 'sockjs-client/dist/sockjs.min.js'],
+      include: ["@stomp/stompjs", "sockjs-client"],
     },
 
     server: {
-      host: true,
+      host: true,          // allow LAN devices (iPad) to open Vite
       port: 5173,
+      strictPort: true,
       cors: true,
+      hmr: {
+        protocol: "ws",
+        host: hmrHost,     // set to your LAN IP via VITE_HMR_HOST for iPad
+        port: 5173,
+      },
       proxy: {
-        // If your axios already targets 8080 directly you can remove this,
-        // but leaving it is harmless and helps during local dev.
-        '/api': {
-          target: apiBase,
-          changeOrigin: true,
-          ws: true,
-          secure: false,
-        },
-        // Static files served by Spring
-        '/uploads': {
+        // HTTP-only proxies; STOMP/SockJS should NOT go through Vite
+        "/api": {
           target: apiBase,
           changeOrigin: true,
           secure: false,
         },
-        // Your local-file handler path (FileService -> "/files/{key}")
-        '/files': {
+        "/uploads": {
           target: apiBase,
           changeOrigin: true,
           secure: false,
         },
-        // If you use SockJS/STOMP under /ws
-        '/ws': {
+        "/files": {
           target: apiBase,
           changeOrigin: true,
-          ws: true,
           secure: false,
         },
+        // IMPORTANT: do NOT proxy '/ws' — SockJS connects directly to backend
       },
     },
 
-    // Also make them work in `vite preview`
+    // If you use `vite preview`
     preview: {
+      host: true,
+      port: 4173,
+      strictPort: true,
       proxy: {
-        '/api':    { target: apiBase, changeOrigin: true, ws: true, secure: false },
-        '/uploads':{ target: apiBase, changeOrigin: true, secure: false },
-        '/files':  { target: apiBase, changeOrigin: true, secure: false },
-        '/ws':     { target: apiBase, changeOrigin: true, ws: true, secure: false },
+        "/api":    { target: apiBase, changeOrigin: true, secure: false },
+        "/uploads":{ target: apiBase, changeOrigin: true, secure: false },
+        "/files":  { target: apiBase, changeOrigin: true, secure: false },
+        // no '/ws' here either
       },
     },
-  }
-})
+  };
+});

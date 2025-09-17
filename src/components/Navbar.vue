@@ -2,8 +2,14 @@
   <nav class="navbar">
     <div class="navbar-container">
       <div class="left">
-        <img src="../assets/logo.png" alt="StayBuddies" class="logo" />
-        <span class="brand">StayBuddies</span>
+        <router-link
+          class="brand-link"
+          :to="{ name: 'home' }"
+          aria-label="Go to Home"
+        >
+          <img src="@/assets/logo.png" alt="StayBuddies" class="logo" />
+          <span class="brand">StayBuddies</span>
+        </router-link>
       </div>
 
       <ul class="nav-links">
@@ -258,6 +264,21 @@ onBeforeUnmount(() => {
   100% {
     transform: rotate(0);
   }
+}
+
+.left .brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: inherit; /* don’t change color when linked */
+}
+.left .brand-link:hover .brand {
+  text-decoration: underline; /* small hover affordance */
+}
+.logo,
+.brand {
+  cursor: pointer;
 }
 
 .badge {

@@ -1,4 +1,3 @@
-// src/router/index.js
 import { createRouter, createWebHistory } from "vue-router";
 
 import Home from "@/pages/Home.vue";
@@ -10,13 +9,13 @@ import Profile from "@/pages/Profile.vue";
 import Messages from "@/pages/Messages.vue";
 import Quiz from "@/pages/Quiz.vue";
 import Suspended from "@/pages/Suspended.vue";
-import RoommateProfile from "@/pages/RoommateProfile.vue";
 import MatchCard from "@/components/MatchCard.vue";
 
-// NOTE: lazy-loaded views
+// Lazy views
 const QuizEdit = () => import("@/pages/QuizEdit.vue");
-// Adjust path below if your Behavioral.vue lives elsewhere (e.g. @/views)
 const BehavioralSettings = () => import("@/components/profile/Behavioral.vue");
+// Public profile (lazy – remove the static import you had)
+const RoommateProfile = () => import("@/pages/RoommateProfile.vue");
 
 const routes = [
   { path: "/", name: "home", component: Home, alias: ["/home"], meta: { public: true } },
@@ -57,7 +56,7 @@ const routes = [
   { path: "/messages", name: "messages", component: Messages, meta: { requiresAuth: true } },
   { path: "/suspended", name: "suspended", component: Suspended, meta: { public: true } },
 
-  // Public roommate profile by numeric id
+  // Canonical public profile
   {
     path: "/roomfinder/:id(\\d+)",
     name: "roomfinder-public",
@@ -66,7 +65,7 @@ const routes = [
     meta: { public: true },
   },
 
-  // Settings pages (new + existing)
+  // Settings
   {
     path: "/settings/quiz",
     name: "quiz-edit",
@@ -80,16 +79,44 @@ const routes = [
     meta: { requiresAuth: true },
   },
 
-  // Redirect legacy /profile/:id to /roomfinder/:id
   {
-    path: "/profile/:id",
-    redirect: (to) => ({ name: "roomfinder-public", params: { id: to.params.id } }),
+    path: "/settings/preferences",
+    name: "prefs",
+    component: () => import("@/pages/Preferences.vue"),
+    meta: { requiresAuth: true },
   },
+  {
+    path: "/settings/compatibility",
+    name: "compat-analysis",
+    component: () => import("@/pages/CompatibilityAnalysis.vue"),
+    meta: { requiresAuth: true },
+  },
+
+  // Legacy path redirect (/profile/:id -> roomfinder-public)
+  {
+    path: "/profile/:id(\\d+)",
+    redirect: (to) => ({ name: "roomfinder-public", params: { id: to.params.id } }),
+    meta: { public: true },
+  },
+
+  // Legacy **named** route so { name: 'public-profile', params:{id} } keeps working
+  {
+    path: "/u/:id(\\d+)",
+    name: "public-profile",
+    redirect: (to) => ({ name: "roomfinder-public", params: { id: to.params.id } }),
+    meta: { public: true },
+  },
+
+  // Optional: simple 404
+  { path: "/:pathMatch(.*)*", redirect: { name: "home" }, meta: { public: true } },
 ];
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(), // or createWebHistory(import.meta.env.BASE_URL)
   routes,
+  scrollBehavior() {
+    return { top: 0 };
+  },
 });
 
 // Global auth guard

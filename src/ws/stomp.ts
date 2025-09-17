@@ -1,47 +1,111 @@
-// src/ws/stomp.ts
+import { Client, IMessage, StompSubscription } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
-import { Client, IMessage, Stomp } from "@stomp/stompjs";
+
+/** Normalize a base URL to http/https (SockJS requirement). */
+function normalizeHttpBase(input?: string): string {
+  if (!input) return window.location.origin;
+  let u = input.trim();
+  u = u.replace(/^ws(s?):\/\//i, (_m, s) => `http${s ? "s" : ""}://`);
+  if (u.startsWith("//")) return `${window.location.protocol}${u}`;
+  if (u.startsWith("/")) return `${window.location.origin}${u}`;
+  if (/^https?:\/\//i.test(u)) return u;
+  return `${window.location.protocol}//${u}`;
+}
+
+/** Decide which base to use for SockJS, then append /ws. */
+function sockJsUrl(): string {
+  const base =
+    import.meta.env.VITE_SOCKJS_BASE ||
+    import.meta.env.VITE_API_BASE ||
+    window.location.origin;
+  return `${normalizeHttpBase(base).replace(/\/+$/, "")}/ws`;
+}
 
 let client: Client | null = null;
-let ready: Promise<void> | null = null;
+let connecting: Promise<void> | null = null;
 
-const WS_BASE = import.meta.env.VITE_WS_BASE || "http://localhost:8080"; // HTTP base (SockJS)
-const WS_URL = `${WS_BASE}/ws`; // matches registry.addEndpoint("/ws").withSockJS()
+// Remember desired subscriptions to re-add after reconnect
+type Handler = (json: any) => void;
+const desired = new Map<string, Handler>();
+const live = new Map<string, StompSubscription>();
 
 export async function connect(): Promise<void> {
-  if (ready) return ready;
-  ready = new Promise<void>((resolve, reject) => {
-    if (client && client.connected) {
-      resolve();
-      return;
-    }
-    client = Stomp.over(() => new SockJS(WS_URL));
-    client.debug = () => {};
-    client.reconnectDelay = 2000;
+  if (client?.connected) return;
+  if (connecting) return connecting;
 
-    client.onConnect = () => resolve();
-    client.onStompError = (f) => reject(f);
-    client.onWebSocketClose = () => {
-      ready = null; // force a fresh connect on next call
-      client = null;
-    };
+  const url = sockJsUrl();
+
+  connecting = new Promise<void>((resolve) => {
+    if (!client) {
+      client = new Client({
+        webSocketFactory: () => new SockJS(url),
+        reconnectDelay: 4000,
+        debug: () => {}, // add console.log to trace frames
+      });
+
+      client.onConnect = () => {
+        // restore lost subs
+        for (const [dest, handler] of desired) {
+          const sub = client!.subscribe(dest, (frame: IMessage) => {
+            try {
+              handler(JSON.parse(frame.body || "{}"));
+            } catch {}
+          });
+          live.set(dest, sub);
+        }
+        connecting = null;
+        resolve();
+      };
+
+      client.onWebSocketClose = () => {
+        for (const sub of live.values()) {
+          try {
+            sub.unsubscribe();
+          } catch {}
+        }
+        live.clear();
+      };
+
+      client.onStompError = (f) => {
+        console.warn("[stomp] broker error", f?.headers, f?.body);
+      };
+      client.onWebSocketError = (e) => {
+        console.warn("[stomp] ws error", e);
+      };
+    }
 
     client.activate();
   });
-  return ready;
+
+  return connecting;
 }
 
+/** Subscribe (remembered) and parse JSON; returns an unsubscribe fn. */
 export async function subscribeJson(
-  topic: string,
-  handler: (payload: any) => void
-) {
+  destination: string,
+  handler: Handler
+): Promise<() => void> {
   await connect();
-  const sub = client!.subscribe(topic, (m: IMessage) => {
-    try {
-      handler(JSON.parse(m.body));
-    } catch {
-      /* ignore */
+  desired.set(destination, handler);
+
+  if (client?.connected) {
+    const sub = client.subscribe(destination, (msg: IMessage) => {
+      try {
+        handler(JSON.parse(msg.body || "{}"));
+      } catch {}
+    });
+    live.set(destination, sub);
+  }
+
+  return () => {
+    desired.delete(destination);
+    const sub = live.get(destination);
+    if (sub) {
+      try {
+        sub.unsubscribe();
+      } finally {
+        live.delete(destination);
+      }
     }
-  });
-  return () => sub.unsubscribe();
+  };
 }

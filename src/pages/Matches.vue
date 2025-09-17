@@ -1,7 +1,6 @@
 <template>
   <div>
     <Navbar />
-
     <section class="matches">
       <div class="header-row">
         <div>
@@ -55,7 +54,28 @@ async function load() {
   error.value = "";
   try {
     const { data } = await api.get("/matches");
-    matches.value = Array.isArray(data) ? data : [];
+
+    // accept several possible server shapes
+    const arr = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.content)
+      ? data.content
+      : Array.isArray(data?.matches)
+      ? data.matches
+      : [];
+
+    // normalize each item so MatchCard never crashes
+    matches.value = arr.map((m) => ({
+      userId: Number(m.userId ?? m.id ?? 0),
+      name: m.name ?? "Roommate",
+      age: m.age ?? null,
+      gender: m.gender ?? "",
+      location: m.location ?? "",
+      compatibility: Number(m.compatibility ?? m.score ?? 0),
+      relationStatus: m.relationStatus ?? "NONE",
+      requestId: m.requestId ?? null,
+      photoUrl: m.photoUrl ?? null,
+    }));
   } catch (e) {
     console.error(e);
     error.value = "Failed to load matches.";

@@ -155,7 +155,8 @@ label {
   font-weight: 700;
   color: #0c4a23;
 }
-input,
+/* Apply full width ONLY to text-like inputs */
+input:not([type="checkbox"]),
 select {
   width: 100%;
   margin-top: 0.4rem;
@@ -163,6 +164,16 @@ select {
   border: 1px solid #1b9536;
   border-radius: 6px;
   outline: none;
+}
+
+
+.checkbox-row input[type="checkbox"] {
+  width: auto;
+  height: 16px;
+  cursor: pointer;
+  margin: 0;            
+  vertical-align: middle;
+  
 }
 input:focus,
 select:focus {
@@ -173,6 +184,13 @@ select:focus {
   align-items: center;
   gap: 0.5rem;
   margin-top: 1rem;
+  
+}
+
+.checkbox-row label {
+  margin: 0;           
+  line-height: 1.2;     
+  cursor: pointer;      
 }
 .primary-btn {
   width: 100%;

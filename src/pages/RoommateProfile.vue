@@ -5,12 +5,12 @@
     </div>
 
     <div v-if="loading" class="loading">Loading…</div>
-    <div v-if="error" class="error">{{ error }}</div>
+    <div v-else-if="error" class="error">{{ error }}</div>
 
-    <div v-if="!loading && !error && profile" class="card">
+    <div v-else-if="profile" class="card">
       <div class="hero-grid">
         <div class="hero-photo">
-          <img v-if="photoUrl" :src="photoUrl" alt="avatar" />
+          <img v-if="resolvedPhoto" :src="resolvedPhoto" alt="avatar" />
           <div v-else class="hero-placeholder">
             <span class="initial">{{ initial }}</span>
           </div>
@@ -30,6 +30,29 @@
               ><i>🧑</i>{{ profile.gender }}</span
             >
           </p>
+
+          <!-- ✅ Verification / housing badges -->
+          <div class="badges">
+            <span class="badge" :class="profile.emailVerified ? 'ok' : 'muted'">
+              <strong>Email</strong>
+              {{ profile.emailVerified ? "verified" : "not verified" }}
+              <template v-if="profile.schoolEmail">
+                ({{ emailDomain(profile.schoolEmail) }})</template
+              >
+            </span>
+            <span
+              class="badge"
+              :class="profile.identityVerified ? 'ok' : 'muted'"
+            >
+              <strong>ID</strong>
+              {{ profile.identityVerified ? "verified" : "not verified" }}
+            </span>
+            <span class="badge" :class="profile.alreadyHasRoom ? 'warn' : 'ok'">
+              <strong>{{
+                profile.alreadyHasRoom ? "Already has room" : "Looking for room"
+              }}</strong>
+            </span>
+          </div>
 
           <div class="bullets">
             <div v-if="profile.university" class="bullet">
@@ -84,11 +107,29 @@ const id = ref(Number(route.params.id || 0));
 const loading = ref(true);
 const error = ref("");
 const profile = ref(null);
-const photoUrl = ref("");
+const fallbackPhoto = ref("");
 
 const initial = computed(() =>
   (profile.value?.name || "?").charAt(0).toUpperCase()
 );
+
+function toAbs(url) {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  const base = import.meta.env.VITE_API_BASE || window.location.origin;
+  return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
+const resolvedPhoto = computed(() => {
+  const a = profile.value?.photoUrl ? toAbs(profile.value.photoUrl) : "";
+  return a || fallbackPhoto.value || "";
+});
+
+function emailDomain(e) {
+  if (!e) return "";
+  const at = e.indexOf("@");
+  return at > 0 ? e.slice(at + 1) : e;
+}
 
 async function load() {
   if (!id.value) {
@@ -96,22 +137,22 @@ async function load() {
     loading.value = false;
     return;
   }
-
   loading.value = true;
   error.value = "";
-  photoUrl.value = "";
   profile.value = null;
+  fallbackPhoto.value = "";
 
   try {
     const { data } = await api.get(`/room-finder/${id.value}/public`);
     profile.value = data;
 
-    // Try to get profile photo
-    try {
-      const r = await api.get(`/room-finder/${id.value}/photo`);
-      photoUrl.value = r.data?.url || "";
-    } catch {
-      photoUrl.value = "";
+    if (!profile.value?.photoUrl) {
+      try {
+        const r = await api.get(`/room-finder/${id.value}/photo`);
+        fallbackPhoto.value = r?.data?.url ? toAbs(r.data.url) : "";
+      } catch {
+        fallbackPhoto.value = "";
+      }
     }
   } catch (e) {
     console.error(e);
@@ -142,13 +183,11 @@ watch(
   min-height: 100vh;
   padding: clamp(1rem, 2vw, 2rem);
 }
-
 .toolbar {
   width: min(1200px, 96vw);
   margin: 0 auto 0.75rem;
 }
 
-/* Card + Hero */
 .card {
   width: min(1200px, 96vw);
   margin: 0 auto;
@@ -167,7 +206,7 @@ watch(
 }
 .hero-photo {
   position: relative;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 4/3;
   width: 100%;
   border-radius: 16px;
   overflow: hidden;
@@ -217,6 +256,39 @@ watch(
 .hero-sub .row i {
   margin-right: 0.45rem;
 }
+
+/* ✅ new badges */
+.badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+.badge {
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid #cbe8d2;
+  background: #f6fff9;
+  color: #0c4a23;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+.badge.ok {
+  background: #e6fff1;
+  border-color: #b8f1ce;
+  color: #1b9536;
+}
+.badge.warn {
+  background: #fff7e6;
+  border-color: #f3d7a6;
+  color: #b76e00;
+}
+.badge.muted {
+  background: #f4f5f6;
+  border-color: #e1e6ea;
+  color: #707e86;
+}
+
 .bullets {
   display: grid;
   gap: 0.45rem;
@@ -238,7 +310,6 @@ watch(
   color: #667085;
 }
 
-/* Sections */
 .section {
   margin-top: 1.1rem;
 }
@@ -286,7 +357,6 @@ watch(
   background: #1b9536;
 }
 
-/* Buttons */
 .btn {
   border: 0;
   border-radius: 999px;
@@ -299,7 +369,6 @@ watch(
   border: 1px solid #b8f1ce;
   padding: 0.55rem 0.9rem;
 }
-
 .loading {
   color: #555;
 }

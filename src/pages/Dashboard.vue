@@ -6,7 +6,7 @@
       <p class="welcome">
         Welcome back! Here's an overview of your roommate matching journey.
       </p>
-      <!-- Recent matches -->
+
       <div class="recent-matches">
         <div class="row">
           <h2>Recent Matches</h2>

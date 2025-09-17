@@ -1,3 +1,4 @@
+<!-- src/pages/PublicProfile.vue -->
 <template>
   <div>
     <Navbar />
