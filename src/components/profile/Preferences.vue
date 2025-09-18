@@ -25,36 +25,57 @@
     <!-- PREFS TAB -->
     <section v-if="!loading && tab === 'prefs'" class="card prefs">
       <h2>Roommate Type Preference</h2>
-      <p class="muted">Your ideal roommate characteristics</p>
 
       <div class="cols">
+        <!-- Preferred -->
         <div class="col">
           <h3>Preferred Characteristics</h3>
-          <ul class="bullets" v-if="hasAny">
+          <ul
+            v-if="(insights.preferredCharacteristics || []).length"
+            class="bullets bullets--good"
+          >
             <li
               v-for="(t, i) in insights.preferredCharacteristics"
               :key="'p-' + i"
             >
               {{ t }}
             </li>
-            <li v-for="(t, i) in insights.idealTraits" :key="'i-' + i">
-              {{ t }}
-            </li>
           </ul>
-          <p class="muted" v-else>
+          <p v-else class="muted">
             • No data yet — finish your quiz to see this.
           </p>
         </div>
 
+        <!-- Deal Breakers -->
         <div class="col">
           <h3>Deal Breakers</h3>
-          <ul class="bullets" v-if="(insights.dealBreakers || []).length">
+          <ul
+            v-if="(insights.dealBreakers || []).length"
+            class="bullets bullets--bad"
+          >
             <li v-for="(t, i) in insights.dealBreakers" :key="'d-' + i">
               {{ t }}
             </li>
           </ul>
-          <p class="muted" v-else>• None detected from your quiz answers.</p>
+          <p v-else class="muted">• None detected from your quiz answers.</p>
         </div>
+      </div>
+
+      <!-- soft divider -->
+      <div class="rule"></div>
+
+      <!-- Ideal traits block -->
+      <div class="ideal-block">
+        <h3>Ideal Roommate Characteristics</h3>
+        <ul
+          v-if="(insights.idealTraits || []).length"
+          class="bullets bullets--neutral"
+        >
+          <li v-for="(t, i) in insights.idealTraits" :key="'i-' + i">
+            {{ t }}
+          </li>
+        </ul>
+        <p v-else class="muted">• You haven’t unlocked this yet.</p>
       </div>
     </section>
 
@@ -62,14 +83,13 @@
     <section v-if="!loading && tab === 'compat'" class="card compat">
       <h2>Compatibility Analysis</h2>
 
-      <div class="tags" v-if="(insights.profileTags || []).length">
+      <div v-if="(insights.profileTags || []).length" class="tags">
         <span
           class="tag"
           v-for="(t, i) in insights.profileTags"
           :key="'tag-' + i"
+          >{{ t }}</span
         >
-          {{ t }}
-        </span>
       </div>
 
       <div class="stats">
@@ -98,7 +118,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted } from "vue";
+import { reactive, ref, onMounted } from "vue";
 import api from "@/api";
 
 const tab = ref("prefs");
@@ -116,13 +136,6 @@ const insights = reactive({
   totalCompared: 0,
 });
 
-const hasAny = computed(() => {
-  return (
-    (insights.preferredCharacteristics?.length || 0) > 0 ||
-    (insights.idealTraits?.length || 0) > 0
-  );
-});
-
 onMounted(fetchInsights);
 
 async function fetchInsights() {
@@ -130,7 +143,6 @@ async function fetchInsights() {
   error.value = "";
   try {
     const { data } = await api.get("/quiz/insights");
-    // defensive defaults
     Object.assign(insights, {
       idealTraits: data.idealTraits ?? [],
       preferredCharacteristics: data.preferredCharacteristics ?? [],
@@ -151,8 +163,14 @@ async function fetchInsights() {
 </script>
 
 <style scoped>
+:root {
+}
+
+/* Layout wrapper */
 .wrap {
   margin-top: 0.5rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
 
 /* Tabs */
@@ -168,9 +186,13 @@ async function fetchInsights() {
   background: #eefaf1;
   color: #176d2b;
   font-weight: 900;
-  border-radius: 10px;
-  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  padding: 0.78rem 1rem;
   cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.05s;
+}
+.tab:active {
+  transform: translateY(1px);
 }
 .tab.active {
   background: #1b9536;
@@ -179,15 +201,55 @@ async function fetchInsights() {
 
 /* Cards */
 .card {
-  background: #ecfff5;
+  background: white;
   border: 1px solid #b8f1ce;
-  border-radius: 12px;
-  padding: 1rem 1rem 1.1rem;
+  border-radius: 14px;
+  padding: 1rem 1rem 1.2rem;
 }
+.card.compat {
+  background-color: white; /* White box for the entire card */
+  padding: 1rem; /* Add spacing inside the card */
+  border: 1px solid #b8f1ce; /* Light border for definition */
+  border-radius: 14px; /* Rounded corners */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+  min-height: 220px; /* Ensure consistent height */
+}
+
+.card.compat h2 {
+  background-color: #e2efe6; /* Slightly different background for the header */
+  padding: 20px; /* Add spacing inside the header */
+  border: 1px solid #ddd; /* Light border for the header */
+  border-radius: 2px; /* Rounded corners for the header */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+  margin: 0 0 1rem; /* Add spacing below the header */
+}
+
+.card.prefs {
+  background-color: white; /* White box for the entire card */
+  padding: 1rem; /* Add spacing inside the card */
+  border: 1px solid #b8f1ce; /* Light border for definition */
+  border-radius: 14px; /* Rounded corners */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+  min-height: 220px; /* Ensure consistent height */
+}
+
+.card.prefs h2 {
+  background-color: #e2efe6; /* Slightly different background for the header */
+  padding: 20px; /* Add spacing inside the header */
+  border: 1px solid #ddd; /* Light border for the header */
+  border-radius: 2px; /* Rounded corners for the header */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+  margin: 0 0 1rem; /* Add spacing below the header */
+}
+
 .card h2 {
   color: #176d2b;
-  margin: 0 0 0.75rem 0;
+  margin: 0 0 0.4rem;
 }
+.headline-sub {
+  margin-top: 0.1rem;
+}
+
 .muted {
   color: #4d6a57;
 }
@@ -195,39 +257,87 @@ async function fetchInsights() {
   font-size: 0.9rem;
 }
 
+/* Two columns area */
 .cols {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
+  gap: 1.5rem;
   margin-top: 0.75rem;
 }
 .col h3 {
   color: #1b7a34;
-  margin-top: 0.25rem;
-}
-.bullets {
-  margin: 0.35rem 0 0;
-  padding-left: 1.1rem;
-}
-.bullets li {
-  margin: 0.2rem 0;
+  margin: 0 0 0.4rem;
 }
 
-/* compat */
+/* Bullets (custom markers) */
+.bullets {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+}
+.bullets li {
+  position: relative;
+  padding-left: 1.15rem;
+  line-height: 1.5;
+  color: #0b4120;
+  margin: 0.34rem 0;
+}
+.bullets li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.58rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #16a34a; /* default = good */
+}
+/* green dots for Preferred */
+.bullets--good li::before {
+  background: #16a34a;
+}
+/* red dots for Deal Breakers */
+.bullets--bad li::before {
+  background: #e53935;
+}
+/* solid black dots for Ideal block (your request) */
+.bullets--neutral li::before {
+  background: #111;
+}
+
+/* Divider line */
+.rule {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.06),
+    rgba(0, 0, 0, 0.04)
+  );
+  margin: 1rem 0 0.75rem;
+  border-radius: 1px;
+}
+
+/* Ideal block heading */
+.ideal-block h3 {
+  color: #1b7a34;
+  margin: 0 0 0.4rem;
+}
+
+/* Compatibility tab */
 .tags {
   display: flex;
-  gap: 0.5rem;
   flex-wrap: wrap;
-  margin-bottom: 0.75rem;
+  gap: 0.5rem;
+  margin: 0.25rem 0 0.85rem;
 }
 .tag {
   background: #e6fff1;
   border: 1px solid #b8f1ce;
-  padding: 0.25rem 0.55rem;
+  padding: 0.3rem 0.7rem;
   border-radius: 999px;
   font-weight: 800;
+  color: #1b7a34;
 }
-
 .stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -236,24 +346,25 @@ async function fetchInsights() {
 .box {
   background: #fff;
   border: 1px dashed #b8f1ce;
-  border-radius: 10px;
-  padding: 0.75rem;
+  border-radius: 12px;
+  padding: 0.85rem;
 }
 .label {
   color: #4d6a57;
   font-size: 0.9rem;
 }
 .val {
+  color: #1b9536;
   font-weight: 900;
   font-size: 1.4rem;
-  color: #1b9536;
-  margin-top: 0.2rem;
+  margin-top: 0.15rem;
 }
 
 .error {
   color: #c92a2a;
 }
 
+/* Responsive */
 @media (max-width: 900px) {
   .cols {
     grid-template-columns: 1fr;

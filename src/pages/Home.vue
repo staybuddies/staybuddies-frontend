@@ -318,51 +318,55 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* HEADER (navbar + auth on one line) */
+/* HEADER (navbar + auth on one line) */
 .navbar {
-  position: sticky;
-  top: 0;
-  z-index: 50;
+  /* remove sticky if you want it truly identical; or leave if you like sticky */
+  /* position: sticky; top: 0; z-index: 50; */
   background: #fff;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid #e6e6e6; /* match NavBar.vue */
   width: 100%;
 }
 
 .navbar-container {
-  max-width: 1200px; /* match hero width */
-  margin: 0 auto; /* center */
-  padding: 0.75rem 1rem; /* comfy horizontal padding */
+  width: 100%; /* match NavBar.vue */
+  padding: 0.5rem 0.05rem; /* same vertical/horizontal padding */
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 1rem; /* prevents crowding on small widths */
+  align-items: center;
 }
 
 .left {
   display: flex;
   align-items: center;
-  gap: 0.6rem; /* space between logo and brand */
-  min-width: 0;
 }
 
 .logo {
-  height: 40px; /* keep logo tidy */
+  height: 40px; /* same as NavBar.vue */
+  margin-right: 0.5rem; /* to match brand spacing */
   width: auto;
   display: block;
   object-fit: contain;
 }
 
 .brand {
-  font-weight: 700;
-  font-size: 1.1rem;
-  color: #075a2a;
+  color: #1b9536; /* same green */
+  font-weight: 800; /* same weight */
+  font-size: 2rem; /* same size as NavBar.vue */
   white-space: nowrap;
 }
 
+/* keep your auth buttons layout; just ensure they don't affect navbar height */
 .auth-actions {
   display: flex;
   gap: 0.6rem;
-  flex-wrap: wrap; /* avoids overflow on narrow screens */
+  flex-wrap: wrap;
 }
+
+/* Optional: remove the mobile rule that hides .brand, so it stays like NavBar.vue
+@media (max-width: 560px) {
+  .brand { display: inline; }
+}
+*/
 
 /* Remove the old topbar spacing if you still have it */
 .topbar,

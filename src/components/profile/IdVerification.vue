@@ -724,6 +724,7 @@ select {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 0.5rem;
+  color: #176d2b;
 }
 
 .badge {

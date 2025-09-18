@@ -9,6 +9,7 @@
 
     <div v-else-if="profile" class="card">
       <div class="hero-grid">
+        <!-- Photo -->
         <div class="hero-photo">
           <img v-if="resolvedPhoto" :src="resolvedPhoto" alt="avatar" />
           <div v-else class="hero-placeholder">
@@ -16,6 +17,7 @@
           </div>
         </div>
 
+        <!-- Info -->
         <div class="hero-info">
           <h1 class="hero-title">{{ profile.name }}</h1>
 
@@ -31,15 +33,16 @@
             >
           </p>
 
-          <!-- ✅ Verification / housing badges -->
+          <!-- Badges -->
           <div class="badges">
             <span class="badge" :class="profile.emailVerified ? 'ok' : 'muted'">
               <strong>Email</strong>
               {{ profile.emailVerified ? "verified" : "not verified" }}
-              <template v-if="profile.schoolEmail">
-                ({{ emailDomain(profile.schoolEmail) }})</template
+              <template v-if="profile.schoolEmail"
+                >({{ emailDomain(profile.schoolEmail) }})</template
               >
             </span>
+
             <span
               class="badge"
               :class="profile.identityVerified ? 'ok' : 'muted'"
@@ -47,10 +50,16 @@
               <strong>ID</strong>
               {{ profile.identityVerified ? "verified" : "not verified" }}
             </span>
+
             <span class="badge" :class="profile.alreadyHasRoom ? 'warn' : 'ok'">
               <strong>{{
                 profile.alreadyHasRoom ? "Already has room" : "Looking for room"
               }}</strong>
+            </span>
+
+            <span class="badge" :class="isMatched ? 'ok' : 'muted'">
+              <strong>Status</strong>
+              {{ isMatched ? "Matched" : "Unmatched" }}
             </span>
           </div>
 
@@ -70,18 +79,16 @@
         </div>
       </div>
 
-      <!-- Lifestyle tags -->
+      <!-- Lifestyle -->
       <div class="section">
         <h3 class="section-title">Lifestyle</h3>
-        <div v-if="(profile.lifestyleTags || []).length" class="chips">
-          <span v-for="t in profile.lifestyleTags" :key="t" class="chip">{{
-            t
-          }}</span>
+        <div v-if="lifeTags.length" class="chips">
+          <span v-for="t in lifeTags" :key="t" class="chip">{{ t }}</span>
         </div>
         <p v-else class="muted">No lifestyle tags available yet.</p>
       </div>
 
-      <!-- Why you match -->
+      <!-- Similar prefs -->
       <div class="section">
         <h3 class="section-title">Similar Preferences</h3>
         <ul v-if="(profile.whyYouMatch || []).length" class="reasons">
@@ -90,6 +97,34 @@
         <p v-else class="muted">
           We’ll explain matches once both of you complete the quiz.
         </p>
+      </div>
+
+      <!-- Debug (open with ?debug=1) -->
+      <div v-if="debug" class="debug">
+        <div class="debug-head">
+          <strong>Debug</strong>
+          <div class="debug-actions">
+            <button class="btn btn-ghost" @click="load">Force refresh</button>
+          </div>
+        </div>
+        <div class="debug-grid">
+          <div class="debug-kv">
+            <b>emailVerified:</b> {{ !!profile.emailVerified }}
+          </div>
+          <div class="debug-kv">
+            <b>identityVerified:</b> {{ !!profile.identityVerified }}
+          </div>
+        </div>
+        <pre class="debug-pre">{{
+          JSON.stringify(
+            {
+              emailVerified: profile.emailVerified,
+              identityVerified: profile.identityVerified,
+            },
+            null,
+            2
+          )
+        }}</pre>
       </div>
     </div>
   </section>
@@ -108,6 +143,7 @@ const loading = ref(true);
 const error = ref("");
 const profile = ref(null);
 const fallbackPhoto = ref("");
+const debug = ref(String(route.query.debug || "") === "1");
 
 const initial = computed(() =>
   (profile.value?.name || "?").charAt(0).toUpperCase()
@@ -131,6 +167,155 @@ function emailDomain(e) {
   return at > 0 ? e.slice(at + 1) : e;
 }
 
+const isMatched = computed(() => {
+  // profile.status is MatchStatus enum; compare by name string
+  const s = String(profile.value?.status || "").toUpperCase();
+  return ["MATCHED", "ACCEPTED", "APPROVED"].includes(s);
+});
+
+/* ----- Lifestyle tag derivation (uses lifestyleAnswers first) ----- */
+const budgetLabels = [
+  "≤ 4,000 THB",
+  "4,001–6,000 THB",
+  "6,001–8,000 THB",
+  "8,001–10,000 THB",
+  "> 10,000 THB",
+];
+const regionLabels = [
+  "Thai",
+  "ASEAN (non-Thai)",
+  "East/South Asia",
+  "Europe/Americas/Oceania",
+  "Other / Prefer not to say",
+];
+
+function tagsFromAnswers(a = []) {
+  const out = [];
+
+  // Detect the scale for the whole array:
+  // zeroBased = values are 0..4 (no 5 present and max <= 4)
+  const nums = (Array.isArray(a) ? a : []).filter((x) => typeof x === "number");
+  const hasAny = nums.length > 0;
+  const maxVal = hasAny ? Math.max(...nums) : null;
+  const zeroBased = hasAny && maxVal <= 4 && !nums.includes(5);
+
+  const v = (i) => {
+    const x = Array.isArray(a) ? a[i] : null;
+    if (x == null) return null;
+    return zeroBased ? x + 1 : x; // only add +1 if the whole set is 0..4
+  };
+
+  // ---- the rest stays the same, using v(i) ----
+  const s = v(0);
+  if (s != null)
+    out.push(s <= 2 ? "Night owl" : s >= 4 ? "Early bird" : "Neutral schedule");
+
+  const t = v(1);
+  if (t != null)
+    out.push(
+      t >= 5
+        ? "Extremely tidy"
+        : t >= 4
+        ? "Very tidy"
+        : t <= 2
+        ? "Relaxed about tidiness"
+        : "Moderately tidy"
+    );
+
+  const n = v(2);
+  if (n != null)
+    out.push(
+      n <= 2
+        ? "Very noise tolerant"
+        : n >= 4
+        ? "Needs quiet"
+        : "Moderate noise tolerance"
+    );
+
+  const g = v(3);
+  if (g != null)
+    out.push(
+      g <= 2
+        ? "Very social"
+        : g === 3
+        ? "Moderately social"
+        : "Low guest frequency"
+    );
+
+  const p = v(4);
+  if (p != null)
+    out.push(
+      p >= 4
+        ? "Pet friendly"
+        : p === 3
+        ? "Neutral with pets"
+        : "Prefers no pets"
+    );
+
+  const sm = v(5);
+  if (sm != null)
+    out.push(
+      sm >= 5
+        ? "Smoke-free home"
+        : sm >= 4
+        ? "Outdoor only"
+        : "Some smoking tolerance"
+    );
+
+  const c = v(6);
+  if (c != null)
+    out.push(
+      c >= 4
+        ? "Great communicator"
+        : c === 3
+        ? "Neutral communicator"
+        : "Avoids confrontation"
+    );
+
+  const sa = v(7);
+  if (sa != null)
+    out.push(
+      sa >= 4
+        ? "Values aligned schedules"
+        : sa <= 2
+        ? "Flexible schedules"
+        : "Some schedule alignment"
+    );
+
+  const budgetLabels = [
+    "≤ 4,000 THB",
+    "4,001–6,000 THB",
+    "6,001–8,000 THB",
+    "8,001–10,000 THB",
+    "> 10,000 THB",
+  ];
+  const regionLabels = [
+    "Thai",
+    "ASEAN (non-Thai)",
+    "East/South Asia",
+    "Europe/Americas/Oceania",
+    "Other / Prefer not to say",
+  ];
+
+  const b = v(8);
+  if (b != null && budgetLabels[b - 1])
+    out.push(`Budget: ${budgetLabels[b - 1]}`);
+
+  const r = v(9);
+  if (r != null && regionLabels[r - 1])
+    out.push(`Region: ${regionLabels[r - 1]}`);
+
+  return out;
+}
+
+const lifeTags = computed(() => {
+  const tags = profile.value?.lifestyleTags;
+  if (Array.isArray(tags) && tags.length) return tags; //  from backend
+  const ans = profile.value?.lifestyleAnswers;
+  return Array.isArray(ans) ? tagsFromAnswers(ans) : []; // fallback
+});
+
+/* ----- Data loading ----- */
 async function load() {
   if (!id.value) {
     error.value = "Invalid profile id.";
@@ -143,16 +328,27 @@ async function load() {
   fallbackPhoto.value = "";
 
   try {
-    const { data } = await api.get(`/room-finder/${id.value}/public`);
+    // Public profile (your DTO now includes emailVerified & identityVerified)
+    const { data } = await api.get(`/room-finder/${id.value}/public`, {
+      params: { t: Date.now() }, // cache-buster
+    });
     profile.value = data;
 
+    // If no explicit photo URL, ask the photo endpoint for a signed/absolute URL
     if (!profile.value?.photoUrl) {
       try {
-        const r = await api.get(`/room-finder/${id.value}/photo`);
+        const r = await api.get(`/room-finder/${id.value}/photo`, {
+          params: { t: Date.now() },
+        });
         fallbackPhoto.value = r?.data?.url ? toAbs(r.data.url) : "";
       } catch {
         fallbackPhoto.value = "";
       }
+    }
+
+    if (debug.value) {
+      // quick visibility while you verify end-to-end
+      console.log("[RoommateProfile] public payload:", profile.value);
     }
   } catch (e) {
     console.error(e);
@@ -187,7 +383,6 @@ watch(
   width: min(1200px, 96vw);
   margin: 0 auto 0.75rem;
 }
-
 .card {
   width: min(1200px, 96vw);
   margin: 0 auto;
@@ -198,6 +393,7 @@ watch(
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.06);
   font-size: 1.03rem;
 }
+
 .hero-grid {
   display: grid;
   grid-template-columns: minmax(260px, 540px) 1fr;
@@ -257,7 +453,7 @@ watch(
   margin-right: 0.45rem;
 }
 
-/* ✅ new badges */
+/* badges */
 .badges {
   display: flex;
   gap: 0.5rem;
@@ -301,6 +497,7 @@ watch(
   gap: 0.45rem;
   font-size: 1.06rem;
 }
+
 .desc {
   color: #344054;
   line-height: 1.55;
@@ -333,6 +530,7 @@ watch(
   font-size: 0.94rem;
   font-weight: 800;
 }
+
 .reasons {
   margin: 0.4rem 0 0;
   padding-left: 1.2rem;
@@ -369,6 +567,7 @@ watch(
   border: 1px solid #b8f1ce;
   padding: 0.55rem 0.9rem;
 }
+
 .loading {
   color: #555;
 }
@@ -380,5 +579,38 @@ watch(
   .hero-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Debug panel */
+.debug {
+  margin-top: 1rem;
+  border: 1px dashed #b8f1ce;
+  background: #f6fff9;
+  border-radius: 10px;
+  padding: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", monospace;
+}
+.debug-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+.debug-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+.debug-kv {
+  font-size: 0.92rem;
+  color: #0c4a23;
+}
+.debug-pre {
+  margin-top: 0.5rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.88rem;
+  color: #0c4a23;
 }
 </style>

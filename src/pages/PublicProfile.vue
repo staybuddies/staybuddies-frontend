@@ -1,4 +1,4 @@
-<!-- src/pages/PublicProfile.vue -->
+<!-- src/pages/PublicProfile.vue
 <template>
   <div>
     <Navbar />
@@ -394,4 +394,4 @@ onMounted(load);
     grid-template-columns: 1fr;
   }
 }
-</style>
+</style> -->

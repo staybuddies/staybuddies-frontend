@@ -92,7 +92,7 @@ watch(
   display: grid;
   grid-template-rows: auto 1fr auto;
   height: 100%;
-  background: #faffd6;
+  background: #fbfde9;
 }
 .chat-head {
   padding: 0.8rem 1rem;
@@ -122,21 +122,22 @@ watch(
   max-width: 70%;
   padding: 0.6rem 0.75rem;
   border-radius: 14px;
-  font-size: 0.95rem;
+  font-size: 1rem;
   line-height: 1.25rem;
   display: inline-flex;
   flex-direction: column;
 }
 .bubble.me {
   align-self: flex-end;
-  background: #1b9536;
+  background: #1b9234;
   color: white;
+  font-weight: 400;
 }
 .bubble.them {
   align-self: flex-start;
-  background: #ffffff;
+  background: #eae9e9fd;
   border: 1px solid #dfeee5;
-  color: #0c4a23;
+  color: black;
 }
 .time {
   opacity: 0.7;

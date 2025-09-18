@@ -37,6 +37,11 @@
         <!-- Identity -->
         <div class="hero-info">
           <h1 class="hero-title">{{ form.name || "-" }}</h1>
+          <div class="status-row">
+            <span class="status-badge" :data-status="form.status">
+              {{ form.status === "MATCHED" ? "Matched" : "Unmatched" }}
+            </span>
+          </div>
           <p class="hero-sub">
             <span v-if="form.location" class="row"
               ><i>📍</i>{{ form.location }}</span
@@ -110,7 +115,13 @@
           <input type="checkbox" v-model="form.alreadyHasRoom" />
           Already have a room
         </label>
-        <!-- Removed Change Password field -->
+        <label>
+          Status
+          <select v-model="form.status" required>
+            <option value="MATCHED">Matched</option>
+            <option value="UNMATCHED">Unmatched</option>
+          </select>
+        </label>
       </div>
 
       <button class="primary">Save Changes</button>
@@ -137,6 +148,7 @@ const form = reactive({
   major: "",
   bio: "",
   alreadyHasRoom: false,
+  status: "UNMATCHED",
 });
 
 const photoUrl = ref(""); // photo url if exists
@@ -157,6 +169,7 @@ async function fetchProfile() {
     Object.assign(form, data);
     form.major = data.major ?? "";
     form.bio = data.bio ?? "";
+    form.status = data.status ?? "UNMATCHED";
 
     try {
       const r = await api.get("/room-finder/me/photo");
@@ -210,6 +223,7 @@ async function savePersonal() {
       major: form.major,
       bio: form.bio,
       alreadyHasRoom: form.alreadyHasRoom,
+      status: form.status,
       // password removed
     });
     await fetchProfile();
@@ -408,5 +422,28 @@ textarea {
   .span-2 {
     grid-column: auto;
   }
+}
+
+.status-row {
+  margin: 0.5rem 0 0.75rem;
+}
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 0.95rem;
+  border: 1px solid #e9ecef;
+  background: #f8f9fa;
+}
+.status-badge[data-status="MATCHED"] {
+  background: #e8fff0;
+  border-color: #b8f1ce;
+  color: #0c7a2a;
+}
+.status-badge[data-status="UNMATCHED"] {
+  background: #fff5f5;
+  border-color: #ffd5d5;
+  color: #b42318;
 }
 </style>

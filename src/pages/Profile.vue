@@ -52,7 +52,7 @@ const currentTab = computed(() => tabs[tab.value]);
 
 <style scoped>
 .profile {
-  background: #faffd6;
+  background: #fbfde9;
   padding: 2rem;
   min-height: 100vh;
 }

@@ -1,7 +1,17 @@
 <template>
   <section class="quiz-edit">
     <header class="topbar">
-      <h1>Edit Lifestyle Quiz</h1>
+      <button
+        class="back-btn"
+        type="button"
+        @click="goBack"
+        aria-label="Go back"
+      >
+        <span class="back-icon">←</span>
+        <span class="back-text">Back</span>
+      </button>
+
+      <h1>Lifestyle Quiz</h1>
       <div class="actions"></div>
     </header>
 
@@ -225,12 +235,26 @@ function textFor(idx, weight) {
   const opt = questions[idx].options.find((o) => o.weight === weight);
   return opt ? opt.text : "";
 }
+function goBack() {
+  // Prefer a returnTo query if present (keeps your existing pattern)
+  const returnTo = route.query.returnTo;
+  if (typeof returnTo === "string" && returnTo.length) {
+    router.replace(returnTo);
+    return;
+  }
+
+  // Otherwise, try browser back; if no history, fall back home
+  if (window.history.length > 1) router.back();
+  else router.push("/");
+}
 
 async function loadExisting() {
   loading.value = true;
   error.value = "";
   try {
-    const { data } = await api.get("/room-finder/me/quiz");
+    const { data } = await api.get("/room-finder/me/quiz", {
+      params: { t: Date.now() }, // cache-buster
+    });
     if (
       Array.isArray(data.answers) &&
       data.answers.length === questions.length
@@ -286,6 +310,51 @@ onMounted(loadExisting);
 
 <style scoped>
 /* palette */
+/* Back button next to title */
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--green);
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 1px 0 #f2faf4;
+  transition: background 0.15s ease, transform 0.06s ease, box-shadow 0.2s ease;
+}
+.back-btn:hover {
+  background: var(--green-ghost);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(27, 149, 54, 0.1);
+}
+.back-btn:active {
+  transform: translateY(0);
+}
+.back-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.back-text {
+  font-size: 0.95rem;
+}
+
+/* keep topbar tidy with the new button */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.topbar h1 {
+  margin: 0;
+  color: #0c4a23;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
 .quiz-edit {
   --green: #1b9536;
   --green-ghost: rgba(27, 149, 54, 0.08);

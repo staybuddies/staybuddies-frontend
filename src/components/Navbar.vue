@@ -175,31 +175,43 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* HEADER (navbar + auth on one line) */
 .navbar {
+  /* remove sticky if you want it truly identical; or leave if you like sticky */
+  /* position: sticky; top: 0; z-index: 50; */
   background: #fff;
-  border-bottom: 1px solid #e6e6e6;
+  border-bottom: 1px solid #e6e6e6; /* match NavBar.vue */
   width: 100%;
 }
+
 .navbar-container {
-  width: 100%;
-  padding: 0.5rem 0.05rem;
+  width: 100%; /* match NavBar.vue */
+  padding: 0.5rem 0.05rem; /* same vertical/horizontal padding */
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+
 .left {
   display: flex;
   align-items: center;
 }
+
 .logo {
-  height: 40px;
-  margin-right: 0.5rem;
+  height: 40px; /* same as NavBar.vue */
+  margin-right: 0.5rem; /* to match brand spacing */
+  width: auto;
+  display: block;
+  object-fit: contain;
 }
+
 .brand {
-  color: #1b9536;
-  font-weight: 800;
-  font-size: 2rem;
+  color: #1b9536; /* same green */
+  font-weight: 800; /* same weight */
+  font-size: 2rem; /* same size as NavBar.vue */
+  white-space: nowrap;
 }
+
 .nav-links {
   display: flex;
   gap: 2rem;

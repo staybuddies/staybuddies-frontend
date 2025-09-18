@@ -64,18 +64,6 @@
         </div>
       </div>
 
-      <!-- Pref flags (optional; you already had these) -->
-      <div class="grid-2" style="margin-top: 0.75rem">
-        <label class="check"
-          ><input type="checkbox" v-model="form.locationSharing" /> Share my
-          rough location with matches</label
-        >
-        <label class="check"
-          ><input type="checkbox" v-model="form.emailNotification" /> Email me
-          important updates</label
-        >
-      </div>
-
       <div class="actions">
         <button class="btn" :disabled="saving">
           {{ saving ? "Saving…" : "Save" }}
@@ -167,23 +155,27 @@ async function save() {
   border: 1px solid #d4f0dc;
   border-radius: 10px;
   background: #f3fff4;
+  margin-top: 0.5rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
 .card__head {
   padding: 0.9rem 1rem;
-  background: #e9fbef;
+  background: #e2efe6;
   border-bottom: 1px solid #d4f0dc;
 }
 .card__head h2 {
   margin: 0 0 0.25rem;
-  color: #0c4a23;
+  color: #176d2b;
 }
 .card__body {
   padding: 1rem;
+  background: white;
 }
 
 .row-title {
   font-weight: 700;
-  color: #0c4a23;
+  color: #176d2b;
   margin-bottom: 0.4rem;
 }
 
@@ -212,12 +204,6 @@ input[type="number"] {
   padding: 0.55rem 0.6rem;
   background: #fff;
   outline: none;
-}
-.check {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: #0c4a23;
 }
 
 .actions {
