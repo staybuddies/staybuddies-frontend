@@ -17,7 +17,6 @@
           </div>
         </div>
 
-        <!-- Info -->
         <div class="hero-info">
           <h1 class="hero-title">{{ profile.name }}</h1>
 

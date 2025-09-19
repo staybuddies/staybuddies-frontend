@@ -11,6 +11,22 @@
         </div>
 
         <div class="actions">
+          <details class="filter">
+            <summary class="btn-secondary">Filter: {{ filterLabel }}</summary>
+            <div class="filter-menu">
+              <button class="filter-item" @click="setThreshold(null)">
+                All
+              </button>
+              <button
+                class="filter-item"
+                v-for="t in thresholds"
+                :key="t"
+                @click="setThreshold(t)"
+              >
+                {{ t }}%+
+              </button>
+            </div>
+          </details>
           <button class="btn-secondary" @click="toggleSort">
             {{ sortDesc ? "Sort: Best → Worst" : "Sort: Worst → Best" }}
           </button>
@@ -47,7 +63,18 @@ import api from "@/api"; // axios instance that adds the Authorization header
 const matches = ref([]);
 const loading = ref(false);
 const error = ref("");
-const sortDesc = ref(true); // start with best → worst
+const sortDesc = ref(true);
+const thresholds = [95, 90, 80, 70, 60];
+const filterThreshold = ref(null); // null = All
+
+const filterLabel = computed(() =>
+  filterThreshold.value == null ? "All" : `${filterThreshold.value}%+`
+);
+
+function setThreshold(t) {
+  filterThreshold.value = t;
+}
+// start with best → worst
 
 async function load() {
   loading.value = true;
@@ -74,7 +101,9 @@ async function load() {
       compatibility: Number(m.compatibility ?? m.score ?? 0),
       relationStatus: m.relationStatus ?? "NONE",
       requestId: m.requestId ?? null,
-      photoUrl: m.photoUrl ?? null,
+      // accept a few common keys:
+      photoUrl:
+        m.photoUrl ?? m.photo ?? m.avatarUrl ?? m.profilePhotoUrl ?? null,
     }));
   } catch (e) {
     console.error(e);
@@ -88,12 +117,18 @@ function toggleSort() {
   sortDesc.value = !sortDesc.value;
 }
 
+const filteredMatches = computed(() => {
+  const t = filterThreshold.value;
+  if (t == null) return matches.value;
+  return matches.value.filter((m) => (m.compatibility ?? 0) >= t);
+});
+
 const sortedMatches = computed(() => {
-  const arr = [...matches.value];
+  const arr = [...filteredMatches.value];
   arr.sort((a, b) =>
     sortDesc.value
-      ? b.compatibility - a.compatibility
-      : a.compatibility - b.compatibility
+      ? (b.compatibility ?? 0) - (a.compatibility ?? 0)
+      : (a.compatibility ?? 0) - (b.compatibility ?? 0)
   );
   return arr;
 });
@@ -205,5 +240,52 @@ onMounted(load);
 }
 .empty {
   color: #666;
+}
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* Filter dropdown */
+.filter {
+  position: relative;
+}
+.filter > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.filter > summary::-webkit-details-marker {
+  display: none;
+}
+.filter[open] > summary {
+  /* subtle pressed look (optional) */
+  background: #eafbf0;
+}
+.filter-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 160px;
+  background: #fff;
+  border: 2px solid #1b9536;
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  padding: 6px;
+  z-index: 5;
+}
+.filter-item {
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-weight: 800;
+  color: #1b9536;
+  cursor: pointer;
+}
+.filter-item:hover {
+  background: #eafbf0;
 }
 </style>

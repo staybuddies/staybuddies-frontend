@@ -28,7 +28,7 @@
             exact
             class="nav-link"
             :class="{ 'active-link': $route.path === '/matches' }"
-            >Matches</router-link
+            >Potential Matches</router-link
           >
         </li>
         <li>
