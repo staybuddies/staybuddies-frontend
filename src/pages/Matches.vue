@@ -6,13 +6,15 @@
         <div>
           <h1>Your Matches</h1>
           <p class="intro">
-            We’ve found potential roommates based on your quiz and profile.
+            We've found potential roommates based on your quiz and profile.
           </p>
         </div>
 
         <div class="actions">
           <details class="filter">
-            <summary class="btn-secondary">Filter: {{ filterLabel }}</summary>
+            <summary class="filter-btn-secondary">
+              Filter: {{ filterLabel }}
+            </summary>
             <div class="filter-menu">
               <button class="filter-item" @click="setThreshold(null)">
                 All
@@ -27,10 +29,10 @@
               </button>
             </div>
           </details>
-          <button class="btn-secondary" @click="toggleSort">
+          <button class="filter-btn-secondary" @click="toggleSort">
             {{ sortDesc ? "Sort: Best → Worst" : "Sort: Worst → Best" }}
           </button>
-          <button class="btn-secondary" @click="reload">Reload</button>
+          <button class="filter-btn-secondary" @click="reload">Reload</button>
         </div>
       </div>
 
@@ -193,11 +195,13 @@ onMounted(load);
 
 <style scoped>
 .matches {
-  background: #fbfde9;
+  background: #ffffff;
   padding: 2rem;
   min-height: 100vh;
   font-family: sans-serif;
+  padding-top: 15px;
 }
+
 .header-row {
   display: flex;
   justify-content: space-between;
@@ -205,25 +209,58 @@ onMounted(load);
   gap: 1rem;
   margin-bottom: 1.25rem;
 }
+
 .matches h1 {
   color: #1b9536;
   font-size: 2rem;
   margin-bottom: 0.25rem;
 }
+
 .intro {
   color: #444;
+  margin: 0;
 }
+
 .actions {
   display: flex;
   gap: 0.75rem;
+  align-items: center;
 }
+
 .cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
   gap: 1rem;
   margin-top: 1rem;
+  align-items: stretch;
 }
-.btn-secondary {
+
+.loading {
+  color: #555;
+  font-size: 1.1rem;
+  text-align: center;
+  padding: 2rem;
+}
+
+.error {
+  color: #c92a2a;
+  font-size: 1.1rem;
+  text-align: center;
+  padding: 2rem;
+  background: #ffe0e0;
+  border-radius: 8px;
+  border: 1px solid #ffa8a8;
+}
+
+.empty {
+  color: #666;
+  font-size: 1.1rem;
+  text-align: center;
+  padding: 2rem;
+}
+
+/* Filter Buttons - Matches Page Specific */
+.filter-btn-secondary {
   background: white;
   color: #1b9536;
   border: 2px solid #1b9536;
@@ -231,37 +268,38 @@ onMounted(load);
   border-radius: 6px;
   cursor: pointer;
   font-weight: bold;
+  font-family: inherit;
+  font-size: inherit;
+  transition: background-color 0.2s ease;
 }
-.loading {
-  color: #555;
+
+.filter-btn-secondary:hover:not(:disabled) {
+  background: #eafbf0;
 }
-.error {
-  color: #c92a2a;
-}
-.empty {
-  color: #666;
-}
-.actions {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
+
+.filter-btn-secondary:focus {
+  outline: 2px solid #1b9536;
+  outline-offset: 2px;
 }
 
 /* Filter dropdown */
 .filter {
   position: relative;
 }
+
 .filter > summary {
   list-style: none;
   cursor: pointer;
 }
+
 .filter > summary::-webkit-details-marker {
   display: none;
 }
+
 .filter[open] > summary {
-  /* subtle pressed look (optional) */
   background: #eafbf0;
 }
+
 .filter-menu {
   position: absolute;
   top: calc(100% + 6px);
@@ -274,6 +312,7 @@ onMounted(load);
   padding: 6px;
   z-index: 5;
 }
+
 .filter-item {
   width: 100%;
   text-align: left;
@@ -284,8 +323,90 @@ onMounted(load);
   font-weight: 800;
   color: #1b9536;
   cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  transition: background-color 0.2s ease;
 }
+
 .filter-item:hover {
   background: #eafbf0;
+}
+
+.filter-item:focus {
+  background: #eafbf0;
+  outline: 2px solid #1b9536;
+  outline-offset: -2px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .matches {
+    padding: 1rem;
+  }
+
+  .header-row {
+    flex-direction: column;
+    align-items: start;
+    gap: 1.5rem;
+  }
+
+  .actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .filter-btn-secondary {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  .cards {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .matches {
+    padding: 0.5rem;
+  }
+
+  .matches h1 {
+    font-size: 1.75rem;
+  }
+
+  .actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .filter-btn-secondary {
+    width: 100%;
+  }
+
+  .filter-menu {
+    left: 0;
+    right: 0;
+    width: auto;
+  }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  .filter-btn-secondary,
+  .filter-item {
+    transition: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .filter-btn-secondary {
+    border-width: 3px;
+  }
+
+  .error {
+    border-width: 2px;
+  }
 }
 </style>

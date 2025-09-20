@@ -3,12 +3,15 @@
     <p class="label">Testimonials</p>
     <h2 class="heading">What Our Users Say</h2>
     <p class="subtext">
-      Hear from students who found their perfect roommate match through our platform.
+      Hear from students who found their perfect roommate match through our
+      platform.
     </p>
     <div class="cards">
       <div class="card">
         <p class="quote">
-          "The behavior analysis feature was a game-changer. I found a roommate who has similar utility usage habits, and we’ve never had an argument about bills!"
+          "The behavior analysis feature was a game-changer. I found a roommate
+          who has similar utility usage habits, and we’ve never had an argument
+          about bills!"
         </p>
         <div class="user">
           <div class="avatar">A</div>
@@ -20,7 +23,9 @@
       </div>
       <div class="card">
         <p class="quote">
-          "The lifestyle quiz matched me with someone who has the same study habits and sleep schedule. It’s been the most peaceful living situation I’ve ever had."
+          "The lifestyle quiz matched me with someone who has the same study
+          habits and sleep schedule. It’s been the most peaceful living
+          situation I’ve ever had."
         </p>
         <div class="user">
           <div class="avatar">S</div>
@@ -32,7 +37,8 @@
       </div>
       <div class="card">
         <p class="quote">
-          "I was skeptical at first, but the behavior tracking dashboard really helped me understand my own habits and find someone compatible."
+          "I was skeptical at first, but the behavior tracking dashboard really
+          helped me understand my own habits and find someone compatible."
         </p>
         <div class="user">
           <div class="avatar">M</div>
@@ -48,18 +54,18 @@
 
 <style scoped>
 .testimonials {
-  background-color: #faffd6;
+  background-color: #f2fff3;
   text-align: center;
   padding: 4rem 1rem;
 }
 .label {
   display: inline-block;
-  background: #d4ff87;
+  background: #e6fff1;
   color: #1b9536;
   font-weight: bold;
   padding: 0.25rem 1rem;
   border-radius: 12px;
-  font-size: 0.9rem;
+  font-size: 1.2rem;
   margin-bottom: 1rem;
 }
 .heading {
@@ -72,7 +78,7 @@
   max-width: 600px;
   margin: 0 auto 2rem;
   color: #444;
-  font-size: 1rem;
+  font-size: 1.1rem;
 }
 .cards {
   display: flex;
@@ -93,7 +99,7 @@
   justify-content: space-between;
 }
 .quote {
-  font-size: 0.95rem;
+  font-size: 1.2rem;
   color: #333;
   margin-bottom: 1.5rem;
 }
@@ -103,16 +109,16 @@
   gap: 1rem;
 }
 .avatar {
-  background-color: #d4ff87;
+  background-color: #e6fff1;
   color: #1b9536;
   font-weight: bold;
-  width: 40px;
-  height: 40px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
+  font-size: 1.1rem;
 }
 strong {
   color: #1b9536;

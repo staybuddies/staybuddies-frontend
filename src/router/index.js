@@ -10,6 +10,7 @@ import Messages from "@/pages/Messages.vue";
 import Quiz from "@/pages/Quiz.vue";
 import Suspended from "@/pages/Suspended.vue";
 import MatchCard from "@/components/MatchCard.vue";
+import Notifications from "@/pages/Notifications.vue";
 
 // Lazy views
 const QuizEdit = () => import("@/pages/QuizEdit.vue");
@@ -55,7 +56,6 @@ const routes = [
   { path: "/quiz", name: "quiz", component: Quiz, meta: { requiresAuth: true } },
   { path: "/messages", name: "messages", component: Messages, meta: { requiresAuth: true } },
   { path: "/suspended", name: "suspended", component: Suspended, meta: { public: true } },
-
   // Canonical public profile
   {
     path: "/roomfinder/:id(\\d+)",
@@ -109,6 +109,8 @@ const routes = [
 
   // Optional: simple 404
   { path: "/:pathMatch(.*)*", redirect: { name: "home" }, meta: { public: true } },
+
+  { path: '/notifications', name: 'notifications', component: () => import('@/pages/Notifications.vue') },
 ];
 
 const router = createRouter({

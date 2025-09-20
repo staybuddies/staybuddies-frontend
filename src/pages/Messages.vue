@@ -33,6 +33,7 @@
   </div>
 </template>
 
+<!-- src/pages/Messages.vue -->
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -52,12 +53,22 @@ function readToken() {
   if (!t || t === "null" || t === "undefined") return null;
   return t;
 }
+async function myIdFallbackFromMe() {
+  try {
+    const { data } = await api.get("/me");
+    const id = Number(data?.id);
+    return Number.isFinite(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
 function myIdFromJwt() {
   try {
     const t = readToken();
     if (!t) return null;
     const p = JSON.parse(atob(t.split(".")[1] || ""));
-    const raw = p?.uid ?? p?.id ?? p?.userId ?? p?.subId ?? p?.user_id ?? null;
+    const raw =
+      p?.uid ?? p?.id ?? p?.userId ?? p?.subId ?? p?.user_id ?? p?.sub ?? null;
     const n = Number(raw);
     return Number.isFinite(n) && n > 0 ? n : null;
   } catch {
@@ -91,12 +102,11 @@ function removeMute(userId) {
   s.delete(String(userId));
   writeMuted(s);
 }
-/* --------------------------------------------- */
 
 const route = useRoute();
 const router = useRouter();
 
-const conversations = ref([]); // [{ id, otherId, otherName, lastMessage, lastTime, unread, messages: MessageDto[] }]
+const conversations = ref([]);
 const activeThreadId = ref(null);
 const loading = ref(false);
 const sending = ref(false);
@@ -107,7 +117,6 @@ const activeConversation = computed(
 );
 
 /* ----------------------- data loaders ----------------------- */
-
 async function fetchThreads() {
   try {
     loading.value = true;
@@ -120,7 +129,7 @@ async function fetchThreads() {
       messages: c.messages ?? [],
     }));
   } catch (e) {
-    console.error(e);
+    console.error("[messages] /messages/threads failed", e);
     error.value = "Failed to load conversations.";
     conversations.value = [];
   } finally {
@@ -129,42 +138,59 @@ async function fetchThreads() {
 }
 
 async function ensureThreadWith(otherId) {
-  const { data } = await api.post(`/messages/thread-with/${otherId}`);
-  return data.threadId;
+  try {
+    const { data } = await api.post(`/messages/thread-with/${otherId}`);
+    if (data && data.threadId) return Number(data.threadId);
+  } catch {}
+  try {
+    const { data } = await api.post(`/messages/thread-with`, {
+      withUserId: otherId,
+    });
+    if (data && data.threadId) return Number(data.threadId);
+  } catch {}
+  try {
+    const { data } = await api.post(`/messages/threads`, {
+      withUserId: otherId,
+    });
+    if (data && data.threadId) return Number(data.threadId);
+  } catch {}
+  return null;
 }
 
 async function fetchMessages(threadId) {
-  const { data } = await api.get(`/messages/threads/${threadId}/messages`);
-  const idx = conversations.value.findIndex((c) => c.id === threadId);
-  if (idx >= 0) {
-    conversations.value[idx].messages = Array.isArray(data) ? data : [];
-    conversations.value[idx].unread = 0;
+  try {
+    const { data } = await api.get(`/messages/threads/${threadId}/messages`);
+    const idx = conversations.value.findIndex((c) => c.id === threadId);
+    if (idx >= 0) {
+      conversations.value[idx].messages = Array.isArray(data) ? data : [];
+      conversations.value[idx].unread = 0;
+    }
+  } catch (e) {
+    console.warn("[messages] load messages failed", e);
   }
 }
 
 /* ----------------------- realtime ----------------------- */
-
 let unsubscribeThread = null;
-let unsubscribeNoticeA = null; // /user/queue/notice
-let unsubscribeNoticeB = null; // /topic/notice.user-{myId}
+let unsubscribeNoticeA = null;
+let unsubscribeNoticeB = null;
 let heartbeatTimer = null;
 
-/** Tell backend the thread is read, then refresh Navbar badge */
 async function markThreadRead(threadId) {
   try {
     await api.put(`/messages/threads/${threadId}/read`);
     window.dispatchEvent(new CustomEvent("sb-unread-refresh"));
-  } catch {
-    // ignore
-  }
+  } catch {}
 }
 
-/** (Re)connect and (re)subscribe if needed – idempotent */
 async function ensureWs() {
-  try {
-    await connect(); // cheap if already connected
+  // Fire and forget — do not block UI
+  connect().catch(() => {});
+  if (myId.value == null) myId.value = await myIdFallbackFromMe();
 
-    // Global notices
+  // Attach global notice subscriptions once connected
+  // We’ll attempt (idempotently) every time ensureWs is called
+  try {
     if (!unsubscribeNoticeA) {
       unsubscribeNoticeA = await subscribeJson("/user/queue/notice", onNotice);
     }
@@ -174,22 +200,13 @@ async function ensureWs() {
         onNotice
       );
     }
-
-    // Active thread subscription
-    if (activeThreadId.value && !unsubscribeThread) {
-      await subscribeToThread(activeThreadId.value);
-    }
-  } catch {
-    // will retry via heartbeat
-  }
+  } catch {}
+  // Active thread sub is managed separately
 }
 
-/** Heartbeat to recover from iOS Safari background sleep and stale sockets */
 function startWsHeartbeat() {
   stopWsHeartbeat();
-  heartbeatTimer = window.setInterval(async () => {
-    await ensureWs();
-  }, 15000);
+  heartbeatTimer = window.setInterval(() => ensureWs(), 15000);
 }
 function stopWsHeartbeat() {
   if (heartbeatTimer) {
@@ -198,12 +215,9 @@ function stopWsHeartbeat() {
   }
 }
 
-/**
- * Subscribe to live events for the active thread
- * We RELY on the subscribed thread id (tid), not evt.threadId.
- */
 async function subscribeToThread(threadId) {
   const tid = Number(threadId);
+  if (!tid) return;
 
   if (unsubscribeThread) {
     try {
@@ -211,68 +225,55 @@ async function subscribeToThread(threadId) {
     } catch {}
     unsubscribeThread = null;
   }
-  await connect();
 
-  unsubscribeThread = await subscribeJson(
-    `/topic/threads/${tid}`,
-    async (evt) => {
-      // Find the conversation by the subscribed id
-      const i = conversations.value.findIndex((c) => c.id === tid);
-      if (i < 0) return;
+  // Don’t await connect here — we already made it non-blocking
+  try {
+    unsubscribeThread = await subscribeJson(
+      `/topic/threads/${tid}`,
+      async (evt) => {
+        const i = conversations.value.findIndex((c) => c.id === tid);
+        if (i < 0) {
+          await fetchThreads();
+          return;
+        }
 
-      const otherId = conversations.value[i].otherId;
-      if (isMuted(otherId)) return;
+        const otherId = conversations.value[i].otherId;
+        if (isMuted(otherId)) return;
 
-      const list =
-        conversations.value[i].messages ??
-        (conversations.value[i].messages = []);
+        const list =
+          conversations.value[i].messages ??
+          (conversations.value[i].messages = []);
+        if (evt?.id && list.some((m) => m.id === evt.id)) return;
 
-      // dedupe by message id if server provides it
-      if (evt?.id && list.some((m) => m.id === evt.id)) return;
+        const text = evt?.text ?? evt?.body ?? evt?.content ?? "";
+        const iso = evt?.time ?? new Date().toISOString();
 
-      // normalize server fields: prefer text, fallback to body
-      const text = evt?.text ?? evt?.body ?? "";
-      const iso = evt?.time ?? new Date().toISOString();
+        let fromMe = false;
+        if (myId.value != null)
+          fromMe = Number(evt?.senderId) === Number(myId.value);
+        else fromMe = Number(evt?.senderId) !== Number(otherId);
 
-      // Determine author
-      const fromMe =
-        myId.value != null
-          ? Number(evt?.senderId) === Number(myId.value)
-          : Number(evt?.senderId) !== Number(otherId);
+        list.push({ id: evt?.id ?? Date.now(), fromMe, text, time: iso });
 
-      list.push({
-        id: evt?.id ?? Date.now(),
-        fromMe,
-        text,
-        time: iso,
-      });
+        conversations.value[i].lastMessage = text;
+        conversations.value[i].lastTime = iso;
 
-      conversations.value[i].lastMessage = text;
-      conversations.value[i].lastTime = iso;
+        const [c] = conversations.value.splice(i, 1);
+        conversations.value.unshift(c);
 
-      // move this conversation to top by lastTime
-      const [c] = conversations.value.splice(i, 1);
-      conversations.value.unshift(c);
-
-      // If it's the active thread, mark read
-      if (activeThreadId.value === tid) {
-        await nextTick();
-        await markThreadRead(tid);
+        if (activeThreadId.value === tid) {
+          await nextTick();
+          await markThreadRead(tid);
+        }
       }
-    }
-  );
+    );
+  } catch {}
 }
 
-/**
- * Global notice listeners -> increments unread for other threads
- * Backend notice: { type:'MESSAGE', threadId }
- */
 function onNotice(notice) {
   if (!notice || String(notice.type).toUpperCase() !== "MESSAGE") return;
   const tid = Number(notice.threadId);
   if (!tid) return;
-
-  // If I'm currently looking at that thread, thread stream will mark it read
   if (activeThreadId.value && Number(activeThreadId.value) === tid) return;
 
   const i = conversations.value.findIndex((c) => c.id === tid);
@@ -282,32 +283,26 @@ function onNotice(notice) {
     const [c] = conversations.value.splice(i, 1);
     conversations.value.unshift(c);
   } else {
-    // thread not in list (new conversation)
     fetchThreads();
   }
-
   window.dispatchEvent(new CustomEvent("sb-unread-refresh"));
 }
 
 /* ----------------------- UX actions ----------------------- */
-
 async function sendMessage(text) {
   const body = text?.trim();
   if (!body || !activeThreadId.value) return;
 
+  // Try to keep WS up, but don’t block sending
+  ensureWs();
+
   try {
     sending.value = true;
-
-    // Make sure we're connected/subscribed (helps after iOS resume)
-    await ensureWs();
-
-    // POST to server
     const { data } = await api.post(
       `/messages/threads/${activeThreadId.value}`,
       { content: body }
     );
 
-    // Optimistic local add (de-dupe later)
     const idx = conversations.value.findIndex(
       (c) => c.id === activeThreadId.value
     );
@@ -315,33 +310,30 @@ async function sendMessage(text) {
       const list =
         conversations.value[idx].messages ??
         (conversations.value[idx].messages = []);
-
       if (!list.some((m) => m.id === data?.id)) {
         list.push({
           id: data?.id ?? Date.now(),
           fromMe: true,
-          text: data?.text ?? body,
+          text: data?.text ?? data?.content ?? body,
           time: data?.time ?? new Date().toISOString(),
         });
-        conversations.value[idx].lastMessage = data?.text ?? body;
+        conversations.value[idx].lastMessage =
+          data?.text ?? data?.content ?? body;
         conversations.value[idx].lastTime =
           data?.time ?? new Date().toISOString();
-
-        // move to top
         const [c] = conversations.value.splice(idx, 1);
         conversations.value.unshift(c);
       }
     }
   } catch (e) {
     if (e?.response?.status === 409) {
-      // canonical thread reconciliation
       const serverOther = e.response?.data?.withUserId;
       const localOther = activeConversation.value?.otherId;
       const otherId = serverOther ?? localOther;
       if (otherId) {
         const canonicalId = await ensureThreadWith(Number(otherId));
         await fetchThreads();
-        await openThread(canonicalId);
+        if (canonicalId) await openThread(canonicalId);
         return;
       }
       await fetchThreads();
@@ -349,7 +341,7 @@ async function sendMessage(text) {
         await openThread(conversations.value[0].id);
       return;
     }
-    console.error(e);
+    console.error("[messages] send failed", e);
     alert("Failed to send message.");
   } finally {
     sending.value = false;
@@ -359,9 +351,7 @@ async function sendMessage(text) {
 async function openThread(threadId) {
   if (!threadId) return;
 
-  // connect first (important for iOS Safari)
-  await ensureWs();
-
+  ensureWs(); // fire & forget
   activeThreadId.value = Number(threadId);
 
   const convo = conversations.value.find((c) => c.id === activeThreadId.value);
@@ -376,12 +366,10 @@ async function openThread(threadId) {
 
   await subscribeToThread(activeThreadId.value);
 
-  // tell Navbar which thread is active
   window.dispatchEvent(
     new CustomEvent("sb-active-thread", { detail: activeThreadId.value })
   );
 
-  // set local unread to 0 (UI) and mark read on server
   const idx = conversations.value.findIndex(
     (c) => c.id === activeThreadId.value
   );
@@ -392,7 +380,6 @@ async function openThread(threadId) {
 }
 
 /* ----------------------- Profile / Block ----------------------- */
-
 function viewProfile() {
   const otherId = activeConversation.value?.otherId;
   if (!otherId) return;
@@ -408,64 +395,66 @@ async function blockUser(passedId) {
     return;
 
   try {
-    // client-side mute
     addMute(otherId);
-
-    // Remove the conversation locally
     const idx = conversations.value.findIndex(
       (c) => Number(c.otherId) === otherId
     );
     const wasActive = activeConversation.value?.otherId === otherId;
     if (idx >= 0) conversations.value.splice(idx, 1);
-
     if (wasActive && unsubscribeThread) {
-      unsubscribeThread();
+      try {
+        unsubscribeThread();
+      } catch {}
       unsubscribeThread = null;
     }
 
-    if (conversations.value.length) {
-      await openThread(conversations.value[0].id);
-    } else {
+    if (conversations.value.length) await openThread(conversations.value[0].id);
+    else {
       activeThreadId.value = null;
       router.replace({ path: "/messages" });
     }
   } catch (e) {
-    console.error(e);
+    console.error("[messages] block failed", e);
     alert("Could not block user. Please try again.");
   }
 }
 
 /* ----------------------- init + lifecycle ----------------------- */
-
 async function init() {
-  await connect(); // 1) socket ready
-  startWsHeartbeat(); // 2) keep-alive / reattach loop
+  // 1) Start WS in background (don’t await)
+  ensureWs();
+  startWsHeartbeat();
 
-  // Notices after connect
-  if (!unsubscribeNoticeA)
-    unsubscribeNoticeA = await subscribeJson("/user/queue/notice", onNotice);
-  if (myId.value != null && !unsubscribeNoticeB)
-    unsubscribeNoticeB = await subscribeJson(
-      `/topic/notice.user-${myId.value}`,
-      onNotice
-    );
-
-  await fetchThreads();
-
-  const threadQ = route.query.thread ? Number(route.query.thread) : null;
+  // 2) If navigated with ?with=USER_ID ensure a thread exists
   const withQ = route.query.with ? Number(route.query.with) : null;
-
-  let targetId = null;
+  let targetThreadId = null;
   if (withQ) {
-    targetId = await ensureThreadWith(withQ);
-    await fetchThreads();
-  } else if (threadQ && conversations.value.some((c) => c.id === threadQ)) {
-    targetId = threadQ;
+    targetThreadId = await ensureThreadWith(withQ);
   }
 
-  if (targetId && conversations.value.some((c) => c.id === targetId)) {
-    await openThread(targetId);
-  } else if (conversations.value.length) {
+  // 3) Load threads regardless of WS state
+  await fetchThreads();
+
+  // 4) Prefer opening ensured or existing thread with that user
+  if (
+    targetThreadId &&
+    conversations.value.some((c) => c.id === targetThreadId)
+  ) {
+    await openThread(targetThreadId);
+    return;
+  }
+  if (withQ) {
+    const existing = conversations.value.find(
+      (c) => Number(c.otherId) === withQ
+    );
+    if (existing) {
+      await openThread(existing.id);
+      return;
+    }
+  }
+
+  // 5) Otherwise open most recent
+  if (conversations.value.length) {
     await openThread(conversations.value[0].id);
   } else {
     activeThreadId.value = null;
@@ -491,9 +480,15 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  if (unsubscribeThread) unsubscribeThread();
-  if (unsubscribeNoticeA) unsubscribeNoticeA();
-  if (unsubscribeNoticeB) unsubscribeNoticeB();
+  try {
+    unsubscribeThread && unsubscribeThread();
+  } catch {}
+  try {
+    unsubscribeNoticeA && unsubscribeNoticeA();
+  } catch {}
+  try {
+    unsubscribeNoticeB && unsubscribeNoticeB();
+  } catch {}
   stopWsHeartbeat();
   document.removeEventListener("visibilitychange", handleVisibility);
   window.removeEventListener("pageshow", handlePageShow);
@@ -506,8 +501,11 @@ onBeforeUnmount(() => {
 .messages-layout {
   display: grid;
   grid-template-columns: 300px 1fr 260px;
-  height: calc(100vh - 60px);
+  height: calc(100vh - 72px); /* Update from 56px to 72px */
+  box-sizing: border-box;
+  overflow: hidden;
 }
+
 @media (max-width: 960px) {
   .messages-layout {
     grid-template-columns: 280px 1fr;

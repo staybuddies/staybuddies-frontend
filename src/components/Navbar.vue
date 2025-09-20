@@ -1,3 +1,4 @@
+<!-- src/components/Navbar.vue -->
 <template>
   <nav class="navbar">
     <div class="navbar-container">
@@ -52,7 +53,12 @@
       </ul>
 
       <div class="right-icons">
-        <button class="bell" @click="openMessages" aria-label="Notifications">
+        <!-- Unified notifications bell -->
+        <button
+          class="bell"
+          @click="openNotifications"
+          aria-label="Notifications"
+        >
           <svg
             class="bell-svg"
             viewBox="0 0 24 24"
@@ -66,149 +72,88 @@
               fill="currentColor"
             />
           </svg>
-          <span v-if="unreadCount" class="badge">{{ badgeText }}</span>
+          <span v-if="unreadBadge" class="badge">{{ unreadBadge }}</span>
         </button>
       </div>
     </div>
   </nav>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
-import api from "@/api";
-import { connect, subscribeJson } from "@/ws/stomp";
 import { startPushOnce } from "@/push";
-
-onMounted(async () => {
-  await fetchUnread();
-  await startNoticeListeners();
-  // Start web push token registration (no-op if already started)
-  startPushOnce();
-  window.addEventListener("sb-active-thread", onActiveThread);
-  window.addEventListener("sb-unread-refresh", onUnreadRefresh);
-});
+import { useNotices } from "@/composables/useNotices"; // from the previous step
 
 const router = useRouter();
 
-const unreadCount = ref(0);
-const badgeText = computed(() =>
-  unreadCount.value > 9 ? "9+" : String(unreadCount.value)
+// Unified unread counter (messages + match notices)
+const { unread, fetchUnread, startLive, stopLive } = useNotices();
+
+const unreadBadge = computed(() =>
+  !unread.value ? "" : unread.value > 9 ? "9+" : String(unread.value)
 );
-const activeThreadId = ref(null);
+
 const justIncremented = ref(false);
-
-let unsubUserQueue = null;
-let unsubFallback = null;
-let myId = null;
-
-function bumpBadge() {
-  unreadCount.value = Math.min(99, unreadCount.value + 1);
+function pulse() {
   justIncremented.value = false;
   requestAnimationFrame(() => (justIncremented.value = true));
   setTimeout(() => (justIncremented.value = false), 800);
 }
 
-async function fetchUnread() {
-  try {
-    const { data } = await api.get("/messages/threads");
-    const list = Array.isArray(data) ? data : [];
-    unreadCount.value = list.reduce((sum, c) => sum + Number(c.unread || 0), 0);
-  } catch {
-    unreadCount.value = 0;
-  }
+function openNotifications() {
+  router.push({ name: "notifications" });
 }
 
-async function startNoticeListeners() {
-  await connect();
-
-  // 1) per-user queue (only if a WebSocket Principal exists)
-  unsubUserQueue = await subscribeJson("/user/queue/notice", (notice) => {
-    if (!notice || notice.type !== "MESSAGE") return;
-    const tid = Number(notice.threadId);
-    if (activeThreadId.value && Number(activeThreadId.value) === tid) return;
-    bumpBadge();
-  });
-
-  // 2) public fallback topic using *real* user id from backend
-  if (!myId) {
-    const { data } = await api.get("/me");
-    myId = data?.id;
-  }
-  if (myId) {
-    unsubFallback = await subscribeJson(
-      `/topic/notice.user-${myId}`,
-      (notice) => {
-        if (!notice || notice.type !== "MESSAGE") return;
-        const tid = Number(notice.threadId);
-        if (activeThreadId.value && Number(activeThreadId.value) === tid)
-          return;
-        bumpBadge();
-      }
-    );
-  }
-}
-
-function openMessages() {
-  router.push({ path: "/messages" });
-}
-
-function onActiveThread(e) {
-  activeThreadId.value = e?.detail ?? null;
-}
-function onUnreadRefresh() {
-  fetchUnread();
-}
-
-onMounted(async () => {
+async function init() {
   await fetchUnread();
-  await startNoticeListeners();
-  window.addEventListener("sb-active-thread", onActiveThread);
-  window.addEventListener("sb-unread-refresh", onUnreadRefresh);
-});
+  await startLive(); // WebSocket live stream for notices
+  startPushOnce(); // register FCM token (no-op if already started)
+  // Foreground push nudge → pulse the bell
+  window.addEventListener("sb-notice-refresh", pulse);
+}
+
+onMounted(init);
 onBeforeUnmount(() => {
-  if (unsubUserQueue) unsubUserQueue();
-  if (unsubFallback) unsubFallback();
-  window.removeEventListener("sb-active-thread", onActiveThread);
-  window.removeEventListener("sb-unread-refresh", onUnreadRefresh);
+  stopLive();
+  window.removeEventListener("sb-notice-refresh", pulse);
 });
 </script>
 
 <style scoped>
 /* HEADER (navbar + auth on one line) */
 .navbar {
-  /* remove sticky if you want it truly identical; or leave if you like sticky */
-  /* position: sticky; top: 0; z-index: 50; */
   background: #fff;
-  border-bottom: 1px solid #e6e6e6; /* match NavBar.vue */
+  border-bottom: 1px solid #e6e6e6;
   width: 100%;
+  position: sticky;
+  top: 0;
+  z-index: 20;
 }
-
 .navbar-container {
-  width: 100%; /* match NavBar.vue */
-  padding: 0.5rem 0.05rem; /* same vertical/horizontal padding */
+  width: 100%;
+  padding: 8px 10px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  min-height: 56px;
 }
-
 .left {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  gap: 10px;
 }
-
 .logo {
-  height: 40px; /* same as NavBar.vue */
-  margin-right: 0.5rem; /* to match brand spacing */
+  height: 40px;
+  margin-right: 0.5rem;
   width: auto;
   display: block;
   object-fit: contain;
 }
-
 .brand {
-  color: #1b9536; /* same green */
-  font-weight: 800; /* same weight */
-  font-size: 2rem; /* same size as NavBar.vue */
+  color: #1b9536;
+  font-weight: 800;
+  font-size: 1.6rem;
   white-space: nowrap;
 }
 
@@ -231,6 +176,7 @@ onBeforeUnmount(() => {
 :deep(.active-link) {
   color: #0b5e1f !important;
 }
+
 .right-icons {
   display: flex;
   gap: 1rem;
@@ -277,17 +223,17 @@ onBeforeUnmount(() => {
     transform: rotate(0);
   }
 }
-
 .left .brand-link {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   text-decoration: none;
-  color: inherit; /* don’t change color when linked */
+  color: inherit;
 }
 .left .brand-link:hover .brand {
-  text-decoration: underline; /* small hover affordance */
+  text-decoration: underline;
 }
+
 .logo,
 .brand {
   cursor: pointer;

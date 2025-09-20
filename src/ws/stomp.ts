@@ -1,3 +1,4 @@
+// src/ws/stomp.ts
 import { Client, IMessage, StompSubscription } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 
@@ -15,7 +16,7 @@ function normalizeHttpBase(input?: string): string {
 /** Decide which base to use for SockJS, then append /ws. */
 function sockJsUrl(): string {
   const base =
-    import.meta.env.VITE_SOCKJS_BASE ||
+    import.meta.env.VITE_SOCKJS_BASE ||      // << set this to your backend base in dev
     import.meta.env.VITE_API_BASE ||
     window.location.origin;
   return `${normalizeHttpBase(base).replace(/\/+$/, "")}/ws`;
@@ -30,38 +31,39 @@ const desired = new Map<string, Handler>();
 const live = new Map<string, StompSubscription>();
 
 export async function connect(): Promise<void> {
+  // if connected, quick return
   if (client?.connected) return;
   if (connecting) return connecting;
 
   const url = sockJsUrl();
 
+  // IMPORTANT: resolve quickly so callers don't block the UI
   connecting = new Promise<void>((resolve) => {
+    const safeResolveOnce = (() => {
+      let done = false;
+      return () => { if (!done) { done = true; resolve(); } };
+    })();
+
     if (!client) {
       client = new Client({
         webSocketFactory: () => new SockJS(url),
-        reconnectDelay: 4000,
-        debug: () => {}, // add console.log to trace frames
+        reconnectDelay: 4000,           // keep trying
+        debug: () => {},                // add console.log to debug frames
       });
 
       client.onConnect = () => {
         // restore lost subs
         for (const [dest, handler] of desired) {
           const sub = client!.subscribe(dest, (frame: IMessage) => {
-            try {
-              handler(JSON.parse(frame.body || "{}"));
-            } catch {}
+            try { handler(JSON.parse(frame.body || "{}")); } catch {}
           });
           live.set(dest, sub);
         }
-        connecting = null;
-        resolve();
       };
 
       client.onWebSocketClose = () => {
         for (const sub of live.values()) {
-          try {
-            sub.unsubscribe();
-          } catch {}
+          try { sub.unsubscribe(); } catch {}
         }
         live.clear();
       };
@@ -75,6 +77,9 @@ export async function connect(): Promise<void> {
     }
 
     client.activate();
+
+    // Don’t block the caller: resolve soon even if WS isn’t up yet
+    setTimeout(safeResolveOnce, 400);   // UI proceeds; WS continues in background
   });
 
   return connecting;
@@ -90,22 +95,15 @@ export async function subscribeJson(
 
   if (client?.connected) {
     const sub = client.subscribe(destination, (msg: IMessage) => {
-      try {
-        handler(JSON.parse(msg.body || "{}"));
-      } catch {}
+      try { handler(JSON.parse(msg.body || "{}")); } catch {}
     });
     live.set(destination, sub);
   }
-
   return () => {
     desired.delete(destination);
     const sub = live.get(destination);
     if (sub) {
-      try {
-        sub.unsubscribe();
-      } finally {
-        live.delete(destination);
-      }
+      try { sub.unsubscribe(); } finally { live.delete(destination); }
     }
   };
 }

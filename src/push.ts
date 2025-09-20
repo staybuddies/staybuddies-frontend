@@ -13,10 +13,8 @@ export async function startPushOnce() {
     return;
   }
 
-  // Register (or update) our SW
   const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
 
-  // Ask permission if needed
   if (Notification.permission === 'default') {
     await Notification.requestPermission();
   }
@@ -25,7 +23,6 @@ export async function startPushOnce() {
     return;
   }
 
-  // Init Firebase from .env
   const app = initializeApp({
     apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
     authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -36,26 +33,28 @@ export async function startPushOnce() {
 
   const messaging = getMessaging(app);
 
-  // Get a Web Push token via VAPID
   const token = await getToken(messaging, {
     vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
     serviceWorkerRegistration: swReg,
   });
+  if (!token) { console.warn('No FCM token received.'); return; }
 
-  if (!token) {
-    console.warn('No FCM token received.');
-    return;
-  }
+  // send to backend (NOTE: using your /api/v1/notifications/register-token)
+  await api.post('/notifications/register-token', { token, platform: 'WEB' });
 
-  // Send token to backend (JWT required)
-  await api.post('/push/token', { token, platform: 'WEB' });
-
-  // Foreground messages → nudge the navbar badge immediately
+  // Foreground pushes -> nudge notices & optionally show system notification
   onMessage(messaging, (payload) => {
+    const d = payload?.data || {};
+    // Bell pulse + unread refresh for unified notices
+    window.dispatchEvent(new CustomEvent('sb-notice-refresh'));
+
+    // Backward compat if you still use message-only counter elsewhere
     window.dispatchEvent(new CustomEvent('sb-unread-refresh'));
+
     try {
-      const d = payload?.data || {};
-      if (document.hidden) new Notification(d.title || 'New message', { body: d.body || '' });
+      if (document.hidden) {
+        new Notification(d.title || 'Notification', { body: d.body || '' });
+      }
     } catch {}
   });
 }

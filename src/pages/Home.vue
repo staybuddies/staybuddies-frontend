@@ -1,24 +1,8 @@
 <template>
-  <header class="navbar">
-    <div class="navbar-container">
-      <!-- left: logo + brand -->
-      <div class="left">
-        <img src="@/assets/logo.png" alt="StayBuddies" class="logo" />
-        <span class="brand">StayBuddies</span>
-      </div>
-
-      <!-- right: auth actions -->
-      <div class="auth-actions" v-if="!isAuthed">
-        <router-link class="btn ghost" to="/register">Sign up</router-link>
-        <router-link class="btn primary" to="/login">Log in</router-link>
-      </div>
-      <div class="auth-actions" v-else>
-        <button class="btn ghost" @click="logout">Log out</button>
-      </div>
-    </div>
-  </header>
+  <Navbar />
 
   <main class="home">
+    <!-- ===== HERO (unchanged) ===== -->
     <section class="hero">
       <div class="hero-inner">
         <div class="copy">
@@ -29,7 +13,6 @@
           </p>
           <div class="cta-row">
             <button class="btn primary" @click="goQuiz">Take the Quiz</button>
-            <!-- changed: Browse -> Go To Dashboard with auth gate -->
             <button class="btn ghost" @click="goDashboard">
               Go To Dashboard
             </button>
@@ -50,7 +33,6 @@
               </div>
             </div>
 
-            <!-- controls (optional) -->
             <button class="nav prev" @click="prev" aria-label="Previous">
               &#10094;
             </button>
@@ -58,7 +40,6 @@
               &#10095;
             </button>
 
-            <!-- dots -->
             <div class="dots">
               <button
                 v-for="(img, i) in images"
@@ -73,10 +54,35 @@
       </div>
     </section>
 
-    <!-- featured listings -->
+    <!-- ===== FEATURED LISTINGS (now paged slider) ===== -->
     <section class="section">
       <div class="container">
-        <h2 class="section-title">Featured Roommate Listings</h2>
+        <div class="section-title-row">
+          <h2 class="section-title">Featured Roommate Listings</h2>
+
+          <!-- pager controls appear only when more than 1 page -->
+          <div v-if="pageCount > 1" class="listings-controls">
+            <button
+              class="carousel-btn"
+              :disabled="pageIndex === 0"
+              @click="prevPage"
+              aria-label="Previous page"
+            >
+              ‹
+            </button>
+            <span class="page-indicator"
+              >{{ pageIndex + 1 }} / {{ pageCount }}</span
+            >
+            <button
+              class="carousel-btn"
+              :disabled="pageIndex === pageCount - 1"
+              @click="nextPage"
+              aria-label="Next page"
+            >
+              ›
+            </button>
+          </div>
+        </div>
 
         <div v-if="error" class="error">{{ error }}</div>
 
@@ -84,36 +90,62 @@
           <div class="card skeleton" v-for="i in 4" :key="i"></div>
         </div>
 
-        <div v-else class="cards">
-          <article
-            class="card"
-            v-for="c in listings"
-            :key="c.id ?? `row-${Math.random()}`"
-          >
-            <div class="thumb" :style="thumbStyle(c.photoUrl)">
-              <span v-if="!c.photoUrl" class="thumb-ph">No photo</span>
-            </div>
-            <div class="card-body">
-              <h3 class="title">{{ c.name || "Roommate" }}</h3>
-              <div class="meta">
-                <span v-if="c.university">{{ c.university }}</span>
-                <span v-if="c.location"> • {{ c.location }}</span>
+        <!-- Slider: each 'page' shows up to 10 cards; we DO NOT change the card markup -->
+        <div v-else class="listings-slider" :class="{ empty: !pages.length }">
+          <div class="track" :style="listingsTrackStyle">
+            <div
+              class="page"
+              v-for="(page, p) in pages"
+              :key="'pg-' + p"
+              role="group"
+              :aria-label="`Listings page ${p + 1}`"
+            >
+              <div class="cards">
+                <article
+                  class="card"
+                  v-for="c in page"
+                  :key="c.id ?? `row-${Math.random()}`"
+                >
+                  <div class="thumb" :style="thumbStyle(c.photoUrl)">
+                    <span v-if="!c.photoUrl" class="thumb-ph">No photo</span>
+                  </div>
+                  <div class="card-body">
+                    <h3 class="title">{{ c.name || "Roommate" }}</h3>
+                    <div class="meta">
+                      <span v-if="c.university">{{ c.university }}</span>
+                      <span v-if="c.location"> • {{ c.location }}</span>
+                    </div>
+                  </div>
+                  <div class="card-actions">
+                    <router-link
+                      v-if="c.id"
+                      class="btn ghost"
+                      :to="{
+                        name: 'roomfinder-public',
+                        params: { id: String(c.id) },
+                      }"
+                    >
+                      View Details
+                    </router-link>
+                    <button v-else class="btn ghost" disabled>
+                      View Details
+                    </button>
+                  </div>
+                </article>
               </div>
             </div>
-            <div class="card-actions">
-              <router-link
-                v-if="c.id"
-                class="btn ghost"
-                :to="{
-                  name: 'roomfinder-public',
-                  params: { id: String(c.id) },
-                }"
-              >
-                View Details
-              </router-link>
-              <button v-else class="btn ghost" disabled>View Details</button>
-            </div>
-          </article>
+          </div>
+
+          <!-- dot nav for pages -->
+          <div v-if="pageCount > 1" class="listings-dots">
+            <button
+              v-for="(_, i) in pageCount"
+              :key="'l-dot-' + i"
+              :class="['l-dot', { active: i === pageIndex }]"
+              @click="goPage(i)"
+              :aria-label="`Go to listings page ${i + 1}`"
+            />
+          </div>
 
           <div v-if="!listings.length" class="empty">
             No featured users yet.
@@ -121,6 +153,10 @@
         </div>
       </div>
     </section>
+
+    <features />
+    <steps />
+    <testimonials />
   </main>
 </template>
 
@@ -128,6 +164,10 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import api from "@/api";
+import Navbar from "@/components/Home_Navbar.vue";
+import features from "@/components/SmartMatching.vue";
+import steps from "@/components/StepsToMatch.vue";
+import testimonials from "@/components/UserTestimonials.vue";
 
 const router = useRouter();
 
@@ -141,7 +181,6 @@ const BAD_TOKENS = new Set([
   "Bearer undefined",
 ]);
 const isAuthed = ref(false);
-
 function readToken() {
   let t =
     localStorage.getItem("token") || sessionStorage.getItem("token") || "";
@@ -168,26 +207,15 @@ function refreshAuth() {
     sessionStorage.removeItem("token");
   }
 }
-function logout() {
-  localStorage.removeItem("token");
-  sessionStorage.removeItem("token");
-  window.dispatchEvent(new Event("sb-auth-changed"));
-  refreshAuth();
-  router.replace("/login");
-}
 function goQuiz() {
   isAuthed.value
     ? router.push("/quiz")
     : router.push({ path: "/login", query: { redirect: "/quiz" } });
 }
-
-/* NEW: gated dashboard navigation */
 function goDashboard() {
-  if (isAuthed.value) {
-    router.push("/dashboard");
-  } else {
-    router.push({ path: "/login", query: { redirect: "/dashboard" } });
-  }
+  isAuthed.value
+    ? router.push("/dashboard")
+    : router.push({ path: "/login", query: { redirect: "/dashboard" } });
 }
 
 /* ---------- featured listings ---------- */
@@ -201,8 +229,6 @@ function absUrl(u) {
   if (/^https?:\/\//i.test(u)) return u;
   return `${API_BASE}${u.startsWith("/") ? "" : "/"}${u}`;
 }
-
-/* STATIC S3 PHOTOS: no timestamp / no changing query string */
 function thumbStyle(url) {
   if (!url) return {};
   const u = absUrl(url);
@@ -213,9 +239,9 @@ async function fetchFeatured() {
   loading.value = true;
   error.value = "";
   listings.splice(0);
-
   try {
-    const { data } = await api.get("/room-finder/public?size=8");
+    // pull enough to fill multiple pages
+    const { data } = await api.get("/room-finder/public?size=60");
     const rows = Array.isArray(data) ? data : data?.content || [];
     rows.forEach((r) => {
       listings.push({
@@ -234,6 +260,40 @@ async function fetchFeatured() {
   }
 }
 
+/* ----- pagination for listings (10 per page) ----- */
+const PAGE_SIZE = 10;
+const pageIndex = ref(0);
+
+const pages = computed(() => {
+  if (!listings.length) return [];
+  const out = [];
+  for (let i = 0; i < listings.length; i += PAGE_SIZE) {
+    out.push(listings.slice(i, i + PAGE_SIZE));
+  }
+  // keep pageIndex in bounds if data shrinks
+  if (pageIndex.value > out.length - 1)
+    pageIndex.value = Math.max(0, out.length - 1);
+  return out;
+});
+const pageCount = computed(() => pages.value.length);
+
+function nextPage() {
+  if (pageIndex.value < pageCount.value - 1) pageIndex.value++;
+}
+function prevPage() {
+  if (pageIndex.value > 0) pageIndex.value--;
+}
+function goPage(i) {
+  pageIndex.value = i;
+}
+
+const listingsTrackStyle = computed(() => ({
+  width: pageCount.value ? `${pageCount.value * 100}%` : "100%",
+  transform: `translateX(-${
+    pageIndex.value * (100 / (pageCount.value || 1))
+  }%)`,
+}));
+
 /* ---------- lifecycle ---------- */
 onMounted(() => {
   refreshAuth();
@@ -246,7 +306,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("focus", refreshAuth);
 });
 
-/* ---------- hero slider (autoplay) ---------- */
+/* ---------- hero slider (unchanged) ---------- */
 const images = ref([
   {
     src: "/images/finding-roomate-2.jpg",
@@ -257,7 +317,6 @@ const images = ref([
   { src: "/images/image3.jpg", alt: "Shared workspace" },
   { src: "/images/image4.jpg", alt: "Movie night" },
 ]);
-
 const index = ref(0);
 const intervalMs = 2000;
 let timer = null;
@@ -265,7 +324,6 @@ let timer = null;
 const trackStyle = computed(() => ({
   transform: `translateX(-${index.value * 100}%)`,
 }));
-
 function next() {
   index.value = (index.value + 1) % images.value.length;
 }
@@ -275,9 +333,7 @@ function prev() {
 function go(i) {
   index.value = i;
 }
-
 const autoplay = true;
-
 function start() {
   stop();
   if (!autoplay || images.value.length <= 1) return;
@@ -295,18 +351,14 @@ function pause() {
 function resume() {
   start();
 }
-
-// pause when tab hidden, resume when visible
 function handleVisibility() {
-  if (document.hidden) stop();
-  else start();
+  document.hidden ? stop() : start();
 }
-
 onMounted(() => {
   start();
   document.addEventListener("visibilitychange", handleVisibility);
-  window.addEventListener("blur", stop); // optional: pause when switching apps
-  window.addEventListener("focus", start); // optional: resume on focus
+  window.addEventListener("blur", stop);
+  window.addEventListener("focus", start);
 });
 onBeforeUnmount(() => {
   stop();
@@ -317,75 +369,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* HEADER (navbar + auth on one line) */
-/* HEADER (navbar + auth on one line) */
-.navbar {
-  /* remove sticky if you want it truly identical; or leave if you like sticky */
-  /* position: sticky; top: 0; z-index: 50; */
-  background: #fff;
-  border-bottom: 1px solid #e6e6e6; /* match NavBar.vue */
-  width: 100%;
-}
-
-.navbar-container {
-  width: 100%; /* match NavBar.vue */
-  padding: 0.5rem 0.05rem; /* same vertical/horizontal padding */
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.left {
-  display: flex;
-  align-items: center;
-}
-
-.logo {
-  height: 40px; /* same as NavBar.vue */
-  margin-right: 0.5rem; /* to match brand spacing */
-  width: auto;
-  display: block;
-  object-fit: contain;
-}
-
-.brand {
-  color: #1b9536; /* same green */
-  font-weight: 800; /* same weight */
-  font-size: 2rem; /* same size as NavBar.vue */
-  white-space: nowrap;
-}
-
-/* keep your auth buttons layout; just ensure they don't affect navbar height */
-.auth-actions {
-  display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-}
-
-/* Optional: remove the mobile rule that hides .brand, so it stays like NavBar.vue
-@media (max-width: 560px) {
-  .brand { display: inline; }
-}
-*/
-
-/* Remove the old topbar spacing if you still have it */
-.topbar,
-.topbar-inner {
-  padding: 0;
-  margin: 0;
-}
-
-/* RESPONSIVE: tighten padding and hide brand if it gets too tight */
-@media (max-width: 560px) {
-  .navbar-container {
-    padding: 0.6rem 0.8rem;
-  }
-  .brand {
-    display: none;
-  } /* optional: keep just the icon on small screens */
-}
-
-/* hero */
+/* ===== HERO (unchanged styles) ===== */
 .hero {
   background: #f2fff3;
   border-bottom: 1px solid #edf5ef;
@@ -412,53 +396,30 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 0.65rem;
 }
-.hero-art .placeholder {
-  width: 100%;
-  aspect-ratio: 16/9;
-  border-radius: 16px;
-  background: #cfdad2;
-  opacity: 0.65;
-  border: 1px solid #cbe8d2;
-}
-.hero-image {
-  width: 100%;
-  max-height: 400px;
-  object-fit: cover;
-  border-radius: 16px;
-  border: 1px solid #cbe8d2;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-}
-
-/* HERO SLIDER */
 .hero-art {
   position: relative;
   width: 100%;
 }
-
 .hero-slider {
   position: relative;
   overflow: hidden;
   border-radius: 16px;
   border: 1px solid #cbe8d2;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-  /* Keep same visual size as before */
   max-height: 400px;
 }
-
 .slides {
   display: flex;
   width: 100%;
   height: 100%;
   transition: transform 600ms ease;
-  will-change: transform; /* GPU accelerated */
+  will-change: transform;
 }
-
 .slide {
   min-width: 100%;
   height: 100%;
   position: relative;
 }
-
 .slide img {
   display: block;
   width: 100%;
@@ -466,8 +427,6 @@ onBeforeUnmount(() => {
   max-height: 400px;
   object-fit: cover;
 }
-
-/* Nav arrows */
 .nav {
   position: absolute;
   top: 50%;
@@ -490,8 +449,6 @@ onBeforeUnmount(() => {
 .nav.next {
   right: 10px;
 }
-
-/* Dots */
 .dots {
   position: absolute;
   left: 0;
@@ -513,6 +470,7 @@ onBeforeUnmount(() => {
   background: #1b9536;
 }
 
+/* ===== Featured Listings ===== */
 .section {
   padding: 1.6rem 0 2.6rem;
 }
@@ -521,12 +479,67 @@ onBeforeUnmount(() => {
   margin: 0 auto;
   padding: 0 1rem;
 }
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
 .section-title {
   margin: 0 0 0.9rem;
   color: #0c4a23;
   font-size: 1.25rem;
 }
 
+.listings-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0.9rem;
+}
+.carousel-btn {
+  background: #fff;
+  color: #1b9536;
+  border: 2px solid #1b9536;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.carousel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.page-indicator {
+  color: #0c4a23;
+  font-weight: 700;
+}
+
+/* slider wrapper */
+.listings-slider {
+  position: relative;
+  overflow: hidden;
+}
+.listings-slider.empty {
+  min-height: 120px;
+}
+
+/* track holds all pages horizontally */
+.track {
+  display: flex;
+  width: 100%;
+  transition: transform 400ms ease;
+  will-change: transform;
+}
+
+/* each page fills the viewport width */
+.page {
+  min-width: 100%;
+  padding: 2px 0; /* small breathing room between pages */
+}
+
+/* cards grid (same card markup as before) */
 .cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -569,7 +582,7 @@ onBeforeUnmount(() => {
   margin-top: auto;
 }
 
-/* buttons */
+/* buttons (existing) */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -606,6 +619,25 @@ onBeforeUnmount(() => {
   padding: 0.8rem 0;
 }
 
+/* pagination dots for listings */
+.listings-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.l-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d9efe1;
+  border: 1px solid #a6e0bb;
+  cursor: pointer;
+}
+.l-dot.active {
+  background: #1b9536;
+}
+
 /* skeleton shimmer */
 .skeleton {
   height: 260px;
@@ -624,6 +656,7 @@ onBeforeUnmount(() => {
   }
 }
 
+/* responsive */
 @media (max-width: 980px) {
   .hero-inner {
     grid-template-columns: 1fr;

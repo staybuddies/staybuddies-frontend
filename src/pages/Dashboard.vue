@@ -172,7 +172,7 @@ async function accept(m) {
   if (!m?.requestId) return;
   busyId.value = m.userId;
   try {
-    await api.post(`/matches/requests/${m.requestId}/accept`);
+    await api.post(`/matches/${m.requestId}/accept`);
     await fetchMatches(); // refresh to capture threadId/status
   } catch (e) {
     console.error(e);
@@ -186,7 +186,7 @@ async function decline(m) {
   if (!m?.requestId) return;
   busyId.value = m.userId;
   try {
-    await api.post(`/matches/requests/${m.requestId}/decline`);
+    await api.post(`/matches/${m.requestId}/decline`);
     m.relationStatus = "DECLINED";
   } catch (e) {
     console.error(e);
@@ -254,13 +254,13 @@ onMounted(refresh);
 <style scoped>
 /* --- Palette & base (vanilla CSS vars) --- */
 .dashboard {
-  --bg: #fbfde9;
-  --card: #fff;
+  --bg: #ffffff;
+  --card: #f1f1f1;
   --card-bd: #e9f3ea;
   --text: #0c4a23;
   --muted: #6b7a72;
   --brand: #1b9536;
-  --brand-600: #147a2c;
+  --brand-600: #1b9536;
   --brand-50: #eafbf0;
 
   --ok-bg: #e8fdd5;
@@ -280,7 +280,7 @@ onMounted(refresh);
 }
 h1 {
   color: var(--brand-600);
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: -0.02em;
   font-size: clamp(1.8rem, 2.6vw, 2.2rem);
   margin: 0 0 0.25rem;
@@ -292,7 +292,7 @@ h1 {
 
 /* --- Card --- */
 .recent-matches {
-  background: var(--card);
+  background: #f4fff7;
   border: 1px solid var(--card-bd);
   border-radius: 16px;
   padding: 1.25rem;

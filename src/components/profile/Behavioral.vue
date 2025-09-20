@@ -2,10 +2,6 @@
   <section class="card">
     <header class="card__head">
       <h2>Manual Behavior Input</h2>
-      <p>
-        Manually input your behavior patterns if you prefer not to upload
-        documents.
-      </p>
     </header>
 
     <form @submit.prevent="save" class="card__body">
