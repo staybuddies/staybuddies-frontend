@@ -115,7 +115,7 @@
                 Choose Image
               </label>
 
-              <button
+              <!-- <button
                 type="button"
                 class="btn-action btn-cam"
                 @click="openCamera"
@@ -127,7 +127,7 @@
                 "
               >
                 📷 Take Photo
-              </button>
+              </button> -->
             </div>
 
             <!-- Selected filename -->

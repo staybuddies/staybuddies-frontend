@@ -188,7 +188,7 @@ onBeforeUnmount(() => {
   background: #f4fff7;
   border: 1px solid #bfe7cc;
   color: #139a41;
-  padding: 6px;
+  padding: 10px;
   border-radius: 12px;
   cursor: pointer;
   line-height: 1;
