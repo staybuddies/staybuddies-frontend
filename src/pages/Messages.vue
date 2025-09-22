@@ -500,15 +500,37 @@ onBeforeUnmount(() => {
 <style scoped>
 .messages-layout {
   display: grid;
-  grid-template-columns: 300px 1fr 260px;
-  height: calc(100vh - 72px); /* Update from 56px to 72px */
+  /* left list | chat | right details  */
+  grid-template-columns: 280px minmax(0, 1fr) 300px;
+  /* add breathing room between columns */
+  column-gap: 16px;
+  height: calc(100vh - 60px);
+  /* keep the whole grid from sitting under the browser edge on tiny rounding */
+  padding: 0 8px 8px;
   box-sizing: border-box;
-  overflow: hidden;
 }
 
-@media (max-width: 960px) {
+/* Large-ish screens: a little narrower right pane */
+@media (max-width: 1400px) {
   .messages-layout {
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: 270px minmax(0, 1fr) 280px;
+    column-gap: 14px;
+  }
+}
+
+/* Tablet: hide the details panel so chat has space */
+@media (max-width: 1024px) {
+  .messages-layout {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+}
+
+/* Narrow: slightly smaller left list */
+@media (max-width: 820px) {
+  .messages-layout {
+    grid-template-columns: 220px minmax(0, 1fr);
+    padding: 0 6px 6px;
+    column-gap: 10px;
   }
 }
 </style>
