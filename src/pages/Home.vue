@@ -157,6 +157,7 @@
     <features />
     <steps />
     <testimonials />
+    <AboutUsSection />
   </main>
 </template>
 
@@ -168,6 +169,7 @@ import Navbar from "@/components/Home_Navbar.vue";
 import features from "@/components/SmartMatching.vue";
 import steps from "@/components/StepsToMatch.vue";
 import testimonials from "@/components/UserTestimonials.vue";
+import AboutUsSection from "@/components/AboutUsSection.vue";
 
 const router = useRouter();
 

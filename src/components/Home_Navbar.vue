@@ -12,6 +12,7 @@
         <a href="#features">Features</a>
         <a href="#how-it-works">How It Works</a>
         <a href="#testimonials">Testimonials</a>
+        <a href="#about-us">About Us</a>
       </nav>
 
       <!-- Right: auth actions -->
