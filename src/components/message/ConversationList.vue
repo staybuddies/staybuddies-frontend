@@ -112,7 +112,7 @@ function formatTime(t) {
   cursor: pointer;
 }
 
-/* content area (adds padding so first item isn’t under sticky head) */
+/* content area (adds padding so first item isn't under sticky head) */
 .cl-container {
   padding-top: calc(var(--head-h));
 }
@@ -185,5 +185,61 @@ function formatTime(t) {
   line-height: 20px;
   min-width: 20px;
   text-align: center;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .cl-list {
+    width: 100%;
+    height: 100%;
+  }
+
+  .cl-head {
+    height: 50px;
+    padding: 0 1rem;
+  }
+
+  .cl-title {
+    font-size: 1.1rem;
+  }
+
+  .cl-container {
+    padding-top: 50px;
+  }
+
+  .cl-item {
+    padding: 0.75rem 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .cl-head {
+    height: 48px;
+    padding: 0 0.8rem;
+  }
+
+  .cl-title {
+    font-size: 1rem;
+  }
+
+  .cl-container {
+    padding-top: 48px;
+  }
+
+  .cl-item {
+    padding: 0.7rem 0.8rem;
+  }
+
+  .cl-name {
+    font-size: 0.95rem;
+  }
+
+  .cl-time {
+    font-size: 0.8rem;
+  }
+
+  .cl-preview {
+    font-size: 0.88rem;
+  }
 }
 </style>

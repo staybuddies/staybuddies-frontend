@@ -326,4 +326,51 @@ textarea {
   gap: 0.5rem;
   margin-top: 0.8rem;
 }
+
+/* Tablet adjustments */
+@media (max-width: 1200px) {
+  .user-details {
+    padding: 0.9rem 1rem;
+  }
+
+  .avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 1rem;
+  }
+
+  .name {
+    font-size: 1rem;
+  }
+
+  .actions {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .btn {
+    padding: 0.5rem 0.7rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Smaller tablet adjustments */
+@media (max-width: 1024px) {
+  .user-details {
+    padding: 0.8rem 0.9rem;
+  }
+
+  .section-title {
+    font-size: 0.9rem;
+  }
+
+  .chip {
+    font-size: 0.75rem;
+    padding: 0.18rem 0.45rem;
+  }
+
+  .bio {
+    font-size: 0.9rem;
+  }
+}
 </style>

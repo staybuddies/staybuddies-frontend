@@ -2,7 +2,7 @@
   <div>
     <Navbar />
 
-    <div class="messages-layout">
+    <div class="messages-layout" :class="{ 'show-chat': activeThreadId }">
       <ConversationList
         :conversations="conversations"
         :active-id="activeThreadId"
@@ -16,6 +16,9 @@
         :conversation="activeConversation"
         :sending="sending"
         @send="sendMessage"
+        @back="handleBackToList"
+        @view-profile="viewProfile"
+        @block="blockUser"
       />
 
       <UserDetails
@@ -189,7 +192,7 @@ async function ensureWs() {
   if (myId.value == null) myId.value = await myIdFallbackFromMe();
 
   // Attach global notice subscriptions once connected
-  // We’ll attempt (idempotently) every time ensureWs is called
+  // We'll attempt (idempotently) every time ensureWs is called
   try {
     if (!unsubscribeNoticeA) {
       unsubscribeNoticeA = await subscribeJson("/user/queue/notice", onNotice);
@@ -226,7 +229,7 @@ async function subscribeToThread(threadId) {
     unsubscribeThread = null;
   }
 
-  // Don’t await connect here — we already made it non-blocking
+  // Don't await connect here — we already made it non-blocking
   try {
     unsubscribeThread = await subscribeJson(
       `/topic/threads/${tid}`,
@@ -293,7 +296,7 @@ async function sendMessage(text) {
   const body = text?.trim();
   if (!body || !activeThreadId.value) return;
 
-  // Try to keep WS up, but don’t block sending
+  // Try to keep WS up, but don't block sending
   ensureWs();
 
   try {
@@ -379,6 +382,12 @@ async function openThread(threadId) {
   await markThreadRead(activeThreadId.value);
 }
 
+/* Handle mobile back button */
+function handleBackToList() {
+  activeThreadId.value = null;
+  router.replace({ path: "/messages" });
+}
+
 /* ----------------------- Profile / Block ----------------------- */
 function viewProfile() {
   const otherId = activeConversation.value?.otherId;
@@ -421,7 +430,7 @@ async function blockUser(passedId) {
 
 /* ----------------------- init + lifecycle ----------------------- */
 async function init() {
-  // 1) Start WS in background (don’t await)
+  // 1) Start WS in background (don't await)
   ensureWs();
   startWsHeartbeat();
 
@@ -531,6 +540,35 @@ onBeforeUnmount(() => {
     grid-template-columns: 220px minmax(0, 1fr);
     padding: 0 6px 6px;
     column-gap: 10px;
+  }
+}
+
+/* Mobile: Stack components and show one at a time */
+@media (max-width: 768px) {
+  .messages-layout {
+    grid-template-columns: 1fr;
+    column-gap: 0;
+    padding: 0;
+    position: relative;
+  }
+
+  /* By default, show conversation list */
+  .messages-layout > :nth-child(1) {
+    display: block;
+  }
+  .messages-layout > :nth-child(2) {
+    display: none;
+  }
+  .messages-layout > :nth-child(3) {
+    display: none;
+  }
+
+  /* When chat is active, show chat window and hide list */
+  .messages-layout.show-chat > :nth-child(1) {
+    display: none;
+  }
+  .messages-layout.show-chat > :nth-child(2) {
+    display: block;
   }
 }
 </style>

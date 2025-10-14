@@ -60,14 +60,14 @@
 import { ref, computed, onMounted } from "vue";
 import Navbar from "@/components/Navbar.vue";
 import MatchCard from "@/components/MatchCard.vue";
-import api from "@/api"; // axios instance that adds the Authorization header
+import api from "@/api";
 
 const matches = ref([]);
 const loading = ref(false);
 const error = ref("");
 const sortDesc = ref(true);
 const thresholds = [95, 90, 80, 70, 60];
-const filterThreshold = ref(null); // null = All
+const filterThreshold = ref(null);
 
 const filterLabel = computed(() =>
   filterThreshold.value == null ? "All" : `${filterThreshold.value}%+`
@@ -76,7 +76,6 @@ const filterLabel = computed(() =>
 function setThreshold(t) {
   filterThreshold.value = t;
 }
-// start with best → worst
 
 async function load() {
   loading.value = true;
@@ -84,7 +83,6 @@ async function load() {
   try {
     const { data } = await api.get("/matches");
 
-    // accept several possible server shapes
     const arr = Array.isArray(data)
       ? data
       : Array.isArray(data?.content)
@@ -93,20 +91,22 @@ async function load() {
       ? data.matches
       : [];
 
-    // normalize each item so MatchCard never crashes
-    matches.value = arr.map((m) => ({
-      userId: Number(m.userId ?? m.id ?? 0),
-      name: m.name ?? "Roommate",
-      age: m.age ?? null,
-      gender: m.gender ?? "",
-      location: m.location ?? "",
-      compatibility: Number(m.compatibility ?? m.score ?? 0),
-      relationStatus: m.relationStatus ?? "NONE",
-      requestId: m.requestId ?? null,
-      // accept a few common keys:
-      photoUrl:
-        m.photoUrl ?? m.photo ?? m.avatarUrl ?? m.profilePhotoUrl ?? null,
-    }));
+    // ✅ Normalize and FILTER OUT MATCHED users
+    matches.value = arr
+      .map((m) => ({
+        userId: Number(m.userId ?? m.id ?? 0),
+        name: m.name ?? "Roommate",
+        age: m.age ?? null,
+        gender: m.gender ?? "",
+        location: m.location ?? "",
+        compatibility: Number(m.compatibility ?? m.score ?? 0),
+        relationStatus: m.relationStatus ?? "NONE",
+        requestId: m.requestId ?? null,
+        photoUrl:
+          m.photoUrl ?? m.photo ?? m.avatarUrl ?? m.profilePhotoUrl ?? null,
+        status: m.status ?? "UNMATCHED", // ✅ Add status field
+      }))
+      .filter((m) => m.status !== "MATCHED"); // ✅ CRITICAL: Filter out MATCHED users
   } catch (e) {
     console.error(e);
     error.value = "Failed to load matches.";
@@ -138,7 +138,6 @@ const sortedMatches = computed(() => {
 async function sendRequest(targetId) {
   try {
     const { data } = await api.post(`/matches/${targetId}/request`);
-    // update the row
     const idx = matches.value.findIndex((m) => m.userId === targetId);
     if (idx >= 0) {
       matches.value[idx] = {
@@ -149,14 +148,16 @@ async function sendRequest(targetId) {
     }
   } catch (e) {
     console.error(e);
-    alert("Could not send request.");
+    // ✅ Show user-friendly error message
+    const errorMsg =
+      e.response?.data?.message || e.message || "Could not send request.";
+    alert(errorMsg);
   }
 }
 
 async function accept(requestId) {
   try {
     await api.post(`/matches/${requestId}/accept`);
-    // find the card with this requestId
     const idx = matches.value.findIndex((m) => m.requestId === requestId);
     if (idx >= 0) {
       matches.value[idx] = {

@@ -13,13 +13,26 @@
         </router-link>
       </div>
 
-      <ul class="nav-links">
+      <!-- Hamburger menu button for mobile -->
+      <button
+        class="hamburger"
+        @click="toggleMobileMenu"
+        aria-label="Toggle menu"
+        :class="{ active: mobileMenuOpen }"
+      >
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
+      <ul class="nav-links" :class="{ 'mobile-open': mobileMenuOpen }">
         <li>
           <router-link
             to="/dashboard"
             exact
             class="nav-link"
             :class="{ 'active-link': $route.path === '/dashboard' }"
+            @click="closeMobileMenu"
             >Dashboard</router-link
           >
         </li>
@@ -29,6 +42,7 @@
             exact
             class="nav-link"
             :class="{ 'active-link': $route.path === '/matches' }"
+            @click="closeMobileMenu"
             >Potential Matches</router-link
           >
         </li>
@@ -38,6 +52,7 @@
             exact
             class="nav-link"
             :class="{ 'active-link': $route.path === '/messages' }"
+            @click="closeMobileMenu"
             >Messages</router-link
           >
         </li>
@@ -47,6 +62,7 @@
             exact
             class="nav-link"
             :class="{ 'active-link': $route.path === '/profile' }"
+            @click="closeMobileMenu"
             >Profile</router-link
           >
         </li>
@@ -83,9 +99,20 @@
 import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import { startPushOnce } from "@/push";
-import { useNotices } from "@/composables/useNotices"; // from the previous step
+import { useNotices } from "@/composables/useNotices";
 
 const router = useRouter();
+
+// Mobile menu state
+const mobileMenuOpen = ref(false);
+
+function toggleMobileMenu() {
+  mobileMenuOpen.value = !mobileMenuOpen.value;
+}
+
+function closeMobileMenu() {
+  mobileMenuOpen.value = false;
+}
 
 // Unified unread counter (messages + match notices)
 const { unread, fetchUnread, startLive, stopLive } = useNotices();
@@ -103,13 +130,13 @@ function pulse() {
 
 function openNotifications() {
   router.push({ name: "notifications" });
+  closeMobileMenu();
 }
 
 async function init() {
   await fetchUnread();
-  await startLive(); // WebSocket live stream for notices
-  startPushOnce(); // register FCM token (no-op if already started)
-  // Foreground push nudge → pulse the bell
+  await startLive();
+  startPushOnce();
   window.addEventListener("sb-notice-refresh", pulse);
 }
 
@@ -254,5 +281,123 @@ onBeforeUnmount(() => {
   line-height: 18px;
   text-align: center;
   box-shadow: 0 0 0 2px #fff;
+}
+
+/* Hamburger menu button */
+.hamburger {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  z-index: 25;
+}
+
+.hamburger span {
+  display: block;
+  width: 25px;
+  height: 3px;
+  background: #1b9536;
+  border-radius: 3px;
+  transition: all 0.3s ease;
+}
+
+.hamburger.active span:nth-child(1) {
+  transform: rotate(45deg) translate(8px, 8px);
+}
+
+.hamburger.active span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger.active span:nth-child(3) {
+  transform: rotate(-45deg) translate(7px, -7px);
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .hamburger {
+    display: flex;
+    order: 2;
+  }
+
+  .right-icons {
+    order: 3;
+  }
+
+  .nav-links {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    gap: 0;
+    background: #fff;
+    border-bottom: 1px solid #e6e6e6;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+
+  .nav-links.mobile-open {
+    max-height: 400px;
+  }
+
+  .nav-links li {
+    width: 100%;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .nav-links li:last-child {
+    border-bottom: none;
+  }
+
+  .nav-link {
+    display: block;
+    padding: 1rem 1.5rem;
+    font-size: 1.1rem;
+  }
+
+  .brand {
+    font-size: 1.3rem;
+  }
+
+  .logo {
+    height: 35px;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar-container {
+    padding: 8px 8px;
+  }
+
+  .brand {
+    font-size: 1.1rem;
+  }
+
+  .logo {
+    height: 30px;
+    margin-right: 0.3rem;
+  }
+
+  .bell {
+    padding: 8px;
+  }
+
+  .bell-svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .badge {
+    min-width: 16px;
+    height: 16px;
+    font-size: 11px;
+    line-height: 16px;
+  }
 }
 </style>

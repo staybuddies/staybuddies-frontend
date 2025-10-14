@@ -1,323 +1,494 @@
 <template>
-  <div class="profile-section">
-    <div class="box">
-      <h2>Personal Information</h2>
-      <p>Update your personal details and contact information.</p>
+  <div>
+    <div v-if="loading" class="loading">Loading…</div>
+    <div v-if="error" class="error">{{ error }}</div>
 
-      <form class="form-grid" @submit.prevent="saveProfile">
-        <div class="input-group first">
-          <input type="text" placeholder="Name" v-model="profile.firstName" />
+    <!-- HERO: big photo on the left, identity on the right -->
+    <section v-if="!loading" class="hero-card">
+      <div class="hero-grid">
+        <!-- Photo -->
+        <div class="hero-photo">
+          <!-- If photo exists, show image + EDIT button -->
+          <template v-if="photoUrl">
+            <img :src="photoUrl" alt="profile photo" />
+            <button class="btn edit" :disabled="busyPhoto" @click="pick">
+              {{ busyPhoto ? "Uploading…" : "Edit Photo" }}
+            </button>
+          </template>
+
+          <!-- Else: placeholder + UPLOAD button -->
+          <div v-else class="hero-placeholder">
+            <span class="initial">{{ initial }}</span>
+            <button class="btn upload" :disabled="busyPhoto" @click="pick">
+              {{ busyPhoto ? "Uploading…" : "Upload Photo" }}
+            </button>
+          </div>
+
+          <!-- hidden input -->
+          <input
+            ref="fileEl"
+            type="file"
+            accept="image/*"
+            @change="onPick"
+            hidden
+          />
         </div>
-      
-        <div class="input-group email">
-          <input type="email" placeholder="Email" v-model="profile.email" />
-        </div>
-        <div class="input-group phone">
-          <div class="phone-field">
-            <select v-model="profile.phoneCountryCode">
-              <option value="+66">+66</option>
-              <option value="+1">+1</option>
-              <option value="+44">+44</option>
-              <option value="+61">+61</option>
-              <option value="+81">+81</option>
-            </select>
-            <input type="text" placeholder="Phone" v-model="profile.phoneNumber" />
+
+        <!-- Identity -->
+        <div class="hero-info">
+          <h1 class="hero-title">{{ form.name || "-" }}</h1>
+          <div class="status-row">
+            <span class="status-badge" :data-status="form.status">
+              {{ form.status === "MATCHED" ? "Matched" : "Unmatched" }}
+            </span>
+          </div>
+          <p class="hero-sub">
+            <span v-if="form.location" class="row"
+              ><i>📍</i>{{ form.location }}</span
+            >
+            <span v-if="form.age" class="row"><i>🎂</i>{{ form.age }}</span>
+            <span v-if="form.gender" class="row"
+              ><i>🧑</i>{{ form.gender }}</span
+            >
+          </p>
+
+          <div class="bullets">
+            <div v-if="form.university" class="bullet">
+              <i>🎓</i>{{ form.university }}
+            </div>
+            <div v-if="form.major" class="bullet">
+              <i>📘</i>{{ form.major }}
+            </div>
+          </div>
+
+          <p class="desc" v-if="form.bio"><b>About:</b> {{ form.bio }}</p>
+          <p class="desc muted" v-else>
+            Write a short bio to help others know you.
+          </p>
+
+          <div v-if="!photoUrl" class="hint">
+            Tip: Add a photo so your profile stands out.
           </div>
         </div>
+      </div>
+    </section>
 
-        <div class="input-group dob">
-          <input type="date" v-model="profile.dob" />
-        </div>
-        <div class="input-group gender">
-          <select v-model="profile.gender">
-            <option value="">Select Gender</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
-            </select>
-        </div>
-        <div class="input-group nationality">
-          <select v-model="profile.nationality">
-            <option value="">Nationality</option>
-            <option value="cambodia">Cambodia</option>
-            <option value="china">China</option>
-            <option value="myanmar">Myanmar</option>
-            <option value="thailand">Thailand</option>
+    <!-- Personal info form (same fields) -->
+    <form v-if="!loading" @submit.prevent="savePersonal" class="form-card">
+      <div class="grid">
+        <label>Full Name <input v-model.trim="form.name" required /></label>
+        <label
+          >Email <input v-model.trim="form.email" type="email" disabled
+        /></label>
+
+        <label>Phone <input v-model.trim="form.phone" required /></label>
+        <label>
+          Gender
+          <select v-model="form.gender">
+            <option value="">—</option>
+            <option>Male</option>
+            <option>Female</option>
+            <option>Other</option>
           </select>
-        </div>
-        <div class="bio-group bio">
-          <textarea placeholder="Bio" v-model="profile.bio"></textarea>
-        </div>
-        <div class="input-group school">
-          <input type="text" placeholder="School/ University" v-model="profile.school" />
-        </div>
-        <div class="input-group major">
-          <input type="text" placeholder="Major/ Field of study" v-model="profile.major" />
-        </div>
-      
+        </label>
 
+        <label
+          >Age <input v-model.number="form.age" type="number" min="16" max="99"
+        /></label>
+        <label>Location <input v-model.trim="form.location" /></label>
 
-      </form>
-    </div>
-    <div class="box">
-      <div class="box-header">
-        <h2>Account Settings</h2>
-        <hr />
-      </div>
-      <div class="setting-row">
-        <span>Email Notification</span>
-        <label class="switch">
-          <input type="checkbox" v-model="profile.emailNotifications" />
-          <span class="slider"></span>
+        <label>University <input v-model.trim="form.university" /></label>
+        <label
+          >Major / Field of Study <input v-model.trim="form.major"
+        /></label>
+
+        <label class="span-2">
+          Bio
+          <textarea
+            v-model.trim="form.bio"
+            rows="4"
+            placeholder="Tell others about yourself"
+          ></textarea>
         </label>
-      </div>
-      <div class="setting-row">
-        <span>Profile Visibility</span>
-        <label class="switch">
-          <input type="checkbox" v-model="profile.profileVisibility" />
-          <span class="slider"></span>
+
+        <label class="checkbox">
+          <input type="checkbox" v-model="form.alreadyHasRoom" />
+          Already have a room
         </label>
-      </div>
-      <div class="setting-row">
-        <span>Location Sharing</span>
-        <label class="switch">
-          <input type="checkbox" v-model="profile.locationSharing" />
-          <span class="slider"></span>
+        <label>
+          Status
+          <select v-model="form.status" required @change="onStatusChange">
+            <option value="MATCHED">Matched</option>
+            <option value="UNMATCHED">Unmatched</option>
+          </select>
         </label>
+
+        <!-- ✅ Warning when status is MATCHED -->
+        <div v-if="form.status === 'MATCHED'" class="status-warning span-2">
+          ⚠️ <strong>Important:</strong> Setting your status to "Matched" will
+          hide you from other users' match lists. You won't appear as a
+          potential roommate until you change back to "Unmatched".
+        </div>
       </div>
-      <button class="save-btn" @click="saveProfile">Save Changes</button>
-    </div>
+
+      <button class="primary">Save Changes</button>
+    </form>
   </div>
 </template>
 
-<script>
-export default {
-  name: "PersonalInfo",
-  data() {
-    return {
-      profile: {
-        firstName: "",
-        email: "",
-        phoneCountryCode: "+66",
-        phoneNumber: "",
-        dob: "",
-        gender: "",
-        nationality:"",
-        bio: "",
-        school: "",
-        major: "",
-        hasRoom: false,
-        emailNotifications: true,
-        profileVisibility: true,
-        locationSharing: true,
-      },
-    };
-  },
-  methods: {
-    saveProfile() {
-      console.log("Profile saved:", this.profile);
-      alert("Profile saved successfully!");
-      //replace this with an API call
-    },
-  },
-};
+<script setup>
+import { reactive, ref, onMounted, computed } from "vue";
+import api from "@/api";
+
+const loading = ref(true);
+const error = ref("");
+
+const form = reactive({
+  id: null,
+  name: "",
+  email: "",
+  phone: "",
+  gender: "",
+  age: null,
+  location: "",
+  university: "",
+  major: "",
+  bio: "",
+  alreadyHasRoom: false,
+  status: "UNMATCHED",
+});
+
+const photoUrl = ref("");
+const busyPhoto = ref(false);
+const fileEl = ref(null);
+const originalStatus = ref("UNMATCHED");
+
+const initial = computed(() =>
+  (form.name || form.email || "?").charAt(0).toUpperCase()
+);
+
+onMounted(fetchProfile);
+
+async function fetchProfile() {
+  loading.value = true;
+  error.value = "";
+  try {
+    const { data } = await api.get("/room-finder/me");
+    Object.assign(form, data);
+    form.major = data.major ?? "";
+    form.bio = data.bio ?? "";
+    form.status = data.status ?? "UNMATCHED";
+    originalStatus.value = form.status;
+
+    try {
+      const r = await api.get("/room-finder/me/photo");
+      photoUrl.value = r.data?.url || "";
+    } catch {
+      photoUrl.value = "";
+    }
+  } catch (e) {
+    error.value = "Could not load profile.";
+    console.error(e);
+  } finally {
+    loading.value = false;
+  }
+}
+
+function pick() {
+  fileEl.value?.click();
+}
+
+async function onPick(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  busyPhoto.value = true;
+  try {
+    const fd = new FormData();
+    fd.append("file", file);
+    const r = await api.post("/room-finder/me/photo", fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    photoUrl.value = r.data?.url || "";
+  } catch (err) {
+    console.error(err);
+    alert("Photo upload failed.");
+  } finally {
+    e.target.value = "";
+    busyPhoto.value = false;
+  }
+}
+
+function onStatusChange() {
+  if (form.status === "MATCHED" && originalStatus.value !== "MATCHED") {
+    const confirmed = confirm(
+      "⚠️ Are you sure?\n\nSetting your status to 'Matched' will:\n" +
+        "• Hide you from other users' match lists\n" +
+        "• Prevent you from sending new match requests\n" +
+        "• Remove you from potential roommate searches\n\n" +
+        "You can change back to 'Unmatched' anytime."
+    );
+    if (!confirmed) {
+      form.status = originalStatus.value;
+    }
+  }
+}
+
+async function savePersonal() {
+  try {
+    await api.put("/room-finder/me", {
+      name: form.name,
+      phone: form.phone,
+      gender: form.gender,
+      age: form.age,
+      location: form.location,
+      university: form.university,
+      major: form.major,
+      bio: form.bio,
+      alreadyHasRoom: form.alreadyHasRoom,
+      status: form.status,
+    });
+
+    originalStatus.value = form.status;
+    await fetchProfile();
+
+    if (form.status === "MATCHED") {
+      alert(
+        "✅ Profile saved!\n\nYou are now marked as MATCHED and won't appear in other users' match lists."
+      );
+    } else {
+      alert("✅ Profile saved successfully!");
+    }
+  } catch (e) {
+    alert("❌ Failed to save profile");
+    console.error(e);
+  }
+}
 </script>
 
 <style scoped>
-.profile-section {
-  margin-top: 1rem;
+/* Hero card (big photo left, details right) */
+.hero-card {
+  background: #fff;
+  border: 1px solid #e9ecef;
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.06);
+  margin-bottom: 1.25rem;
+  font-size: 1.02rem;
 }
-
-.box {
-  background: #e6fff1;
-  border-radius: 8px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-h2 {
-  color: #1b9536;
-  margin-bottom: 0.5rem;
-}
-
-.form-grid {
+.hero-grid {
   display: grid;
-  grid-template-columns: 300px 300px;
-  grid-template-areas:
-    "first first"
-    "email nationality"
-    "phone phone"
-    "dob gender"
-    "bio bio"
-    "school major";
-  gap: 1.5rem;
-  margin-top: 1.5rem;
+  grid-template-columns: minmax(260px, 540px) 1fr;
+  gap: 1.25rem;
+  align-items: start;
 }
-
-.first {
-  grid-area: first;
-}
-
-
-.email {
-  grid-area: email;
-}
-
-.phone {
-  grid-area: phone;
-}
-
-.phone-field {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.phone-field select {
-  width: 90px;
-  padding: 0.6rem;
-  border: 1px solid #1b9536;
-  border-radius: 4px;
-  font-size: 1rem;
-  background-color: white;
-}
-
-.phone-field input {
-  flex: 1;
-}
-
-.dob {
-  grid-area: dob;
-}
-
-.gender {
-  grid-area: gender;
-}
-
-.nationality{
-  grid-area: nationality;
-}
-.gender select {
+.hero-photo {
+  position: relative;
+  aspect-ratio: 4 / 3;
   width: 100%;
-  max-width: 300px;
-  padding: 0.6rem;
-  border: 1px solid #1b9536;
-  border-radius: 4px;
-  font-size: 1rem;
-  background-color: white;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #f8f9fa;
+  border: 1px solid #e8f3ea;
+}
+.hero-photo > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hero-placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+.initial {
+  width: 100px;
+  height: 100px;
+  border-radius: 999px;
+  background: #e6fff1;
+  color: #1b9536;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 2.4rem;
+  border: 1px solid #b8f1ce;
+}
+.btn.upload,
+.btn.edit {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  background: #1b9536;
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  padding: 0.6rem 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(27, 149, 54, 0.25);
+}
+.btn.upload[disabled],
+.btn.edit[disabled] {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
-.bio {
-  grid-area: bio;
+.hero-info {
+  padding-top: 0.2rem;
+}
+.hero-title {
+  margin: 0;
+  font-size: clamp(2.6rem, 3.8vw, 3.2rem);
+  font-weight: 1000;
+  color: #0c4a23;
+}
+.hero-sub {
+  margin: 0.65rem 0 0.95rem;
+  color: #3d3d3d;
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  font-size: 1.1rem;
+}
+.hero-sub .row i {
+  margin-right: 0.45rem;
+}
+.bullets {
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 0.7rem;
+}
+.bullet {
+  color: #0c4a23;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 1.06rem;
+}
+.desc {
+  color: #344054;
+  line-height: 1.55;
+  font-size: 1.06rem;
+}
+.muted {
+  color: #667085;
+}
+.hint {
+  color: #666;
+  margin-top: 0.45rem;
 }
 
-.school {
-  grid-area: school;
+/* Form card */
+.form-card {
+  background: #fff;
+  border: 1px solid #e9ecef;
+  border-radius: 16px;
+  padding: 1.1rem;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.05);
+  font-size: 1.02rem;
 }
-
-.major {
-  grid-area: major;
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.1rem;
 }
-
-.input-group,
-.bio-group {
+.span-2 {
+  grid-column: 1 / -1;
+}
+label {
   display: flex;
   flex-direction: column;
+  font-weight: 750;
+  color: #0c4a23;
+  font-size: 1.02rem;
 }
-
 input,
-textarea,
-select {
-  width: 100%;
-  padding: 0.6rem;
-  border: 1px solid #1b9536;
-  border-radius: 4px;
-  font-size: 1rem;
-  background-color: white;
-}
-
+select,
 textarea {
-  min-height: 100px;
-}
-
-.box-header {
-  margin-top: -0.5rem;
-}
-
-.setting-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 1.5rem;
-}
-
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 40px;
-  height: 20px;
-}
-
-.switch input {
-  display: none;
-}
-
-.slider {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  border-radius: 20px;
-  transition: 0.4s;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 16px;
-  width: 16px;
-  left: 2px;
-  bottom: 2px;
-  background-color: white;
-  border-radius: 50%;
-  transition: 0.4s;
-}
-
-.switch input:checked + .slider {
-  background-color: #1b9536;
-}
-
-.switch input:checked + .slider:before {
-  transform: translateX(20px);
-}
-
-.save-btn {
-  background: #1b9536;
-  color: white;
-  padding: 0.7rem 1.2rem;
-  border: none;
-  border-radius: 4px;
-  font-weight: bold;
-  cursor: pointer;
-  margin-top: 1.5rem;
-}
-
-.checkbox-group {
-  grid-column: span 0;
-  display: flex;
-  align-items: center;
-  margin-top: -1rem;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
+  margin-top: 0.4rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #1b9536;
+  border-radius: 8px;
+  font-family: inherit;
   font-size: 1rem;
-  color: #333;
-  gap: 0.5rem;
-  font-weight: 500;
+  resize: vertical;
+}
+.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 650;
+}
+.primary {
+  margin-top: 1rem;
+  padding: 0.9rem 1.3rem;
+  background: #1b9536;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 1.02rem;
+  cursor: pointer;
+}
+.loading {
+  color: #666;
+}
+.error {
+  color: #c92a2a;
+  margin-bottom: 0.25rem;
 }
 
-</style>
+/* ✅ Status warning */
+.status-warning {
+  background: #fff5e6;
+  border: 2px solid #ffa940;
+  border-radius: 10px;
+  padding: 1rem;
+  color: #b54708;
+  font-weight: 600;
+  display: flex;
+  align-items: start;
+  gap: 0.5rem;
+  line-height: 1.5;
+}
 
+@media (max-width: 980px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .span-2 {
+    grid-column: auto;
+  }
+}
+
+.status-row {
+  margin: 0.5rem 0 0.75rem;
+}
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 0.95rem;
+  border: 1px solid #e9ecef;
+  background: #f8f9fa;
+}
+.status-badge[data-status="MATCHED"] {
+  background: #e8fff0;
+  border-color: #b8f1ce;
+  color: #0c7a2a;
+}
+.status-badge[data-status="UNMATCHED"] {
+  background: #fff5f5;
+  border-color: #ffd5d5;
+  color: #b42318;
+}
+</style>
