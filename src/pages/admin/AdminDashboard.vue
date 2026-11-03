@@ -95,7 +95,6 @@ async function fetchAdminDashboard(r) {
     throw new Error("No admin token");
   }
 
-  console.log("📤 Sending token:", token.substring(0, 30) + "..."); // ⭐ ADD THIS
 
   const res = await axios.get("/api/admin/dashboard", {
     params: { range: r },

@@ -72,8 +72,8 @@
 
         <div class="footer-links">
           <p class="login-link">
-            Already have an account?
-            <router-link to="/admin/login">Login here</router-link>
+            Manage your team:
+            <router-link to="/admin/management">Back to administrators</router-link>
           </p>
           <router-link to="/" class="back-link">
             ← Back to Main Site
@@ -86,10 +86,8 @@
 
 <script setup>
 import { ref } from "vue";
-import { useRouter } from "vue-router";
 import api from "@/api";
 
-const router = useRouter();
 
 const formData = ref({
   name: "",
@@ -103,43 +101,22 @@ const error = ref("");
 const success = ref("");
 
 async function handleRegister() {
+  if (loading.value) return;
   error.value = "";
   success.value = "";
   loading.value = true;
 
   try {
     // Register the admin
-    const { data } = await api.post("/admin/register", {
+    await api.post("/admin/register", {
       name: formData.value.name,
       email: formData.value.email,
       password: formData.value.password,
       phone: formData.value.phone,
     });
 
-    success.value = "Account created successfully! Logging you in...";
-
-    // Auto-login after successful registration
-    setTimeout(async () => {
-      try {
-        const loginResponse = await api.post("/admin/login", {
-          email: formData.value.email,
-          password: formData.value.password,
-        });
-
-        if (loginResponse.data.token && loginResponse.data.admin) {
-          localStorage.setItem("adminToken", loginResponse.data.token);
-          localStorage.setItem(
-            "adminUser",
-            JSON.stringify(loginResponse.data.admin)
-          );
-
-          router.push("/admin/dashboard");
-        }
-      } catch (loginErr) {
-        console.error("Auto-login failed:", loginErr);
-        router.push("/admin/login");
-      }
-    }, 1500);
+    success.value = "Administrator created. Your current session is unchanged.";
+    formData.value = { name: "", email: "", password: "", phone: "" };
   } catch (err) {
     console.error("Admin registration failed:", err);
 

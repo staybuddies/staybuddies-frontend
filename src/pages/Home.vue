@@ -6,6 +6,7 @@
     <section class="hero">
       <div class="hero-inner">
         <div class="copy">
+          <p class="eyebrow">FIND YOUR PEOPLE. FEEL AT HOME.</p>
           <h1>Find Your Ideal Roommate<br />Today</h1>
           <p class="tagline">
             Explore the easiest way to connect and share your space with
@@ -19,8 +20,8 @@
           </div>
         </div>
 
-        <div class="hero-art" aria-hidden="true">
-          <div class="hero-slider" @mouseenter="pause()" @mouseleave="resume()">
+        <div class="hero-art" role="region" aria-label="Shared living inspiration">
+          <div class="hero-slider" @mouseenter="pause()" @mouseleave="resume()" @focusin="pause()" @focusout="resume()">
             <div class="slides" :style="trackStyle">
               <div
                 class="slide"
@@ -29,7 +30,7 @@
                 role="img"
                 :aria-label="img.alt || 'Roommate photo'"
               >
-                <img :src="img.src" :alt="img.alt || 'Roommate photo'" />
+                <img :src="img.src" :alt="img.alt || 'Roommate photo'" :loading="i === 0 ? 'eager' : 'lazy'" width="800" height="600" />
               </div>
             </div>
 
@@ -40,6 +41,7 @@
               &#10095;
             </button>
 
+            <button class="playback" :aria-pressed="manuallyPaused" @click="togglePlayback">{{ manuallyPaused ? "Play slideshow" : "Pause slideshow" }}</button>
             <div class="dots">
               <button
                 v-for="(img, i) in images"
@@ -47,6 +49,7 @@
                 :class="['dot', { active: i === index }]"
                 @click="go(i)"
                 :aria-label="`Go to slide ${i + 1}`"
+                :aria-current="i === index ? 'true' : undefined"
               />
             </div>
           </div>
@@ -84,18 +87,21 @@
           </div>
         </div>
 
-        <div v-if="error" class="error">{{ error }}</div>
+        <div v-if="error" class="error" role="alert">{{ error }} <button class="btn outline" @click="fetchFeatured">Try again</button></div>
 
-        <div v-if="loading" class="cards">
+        <div v-if="loading" class="cards" role="status" aria-label="Loading featured roommates">
           <div class="card skeleton" v-for="i in 4" :key="i"></div>
         </div>
 
         <!-- Slider: each 'page' shows up to 10 cards; we DO NOT change the card markup -->
-        <div v-else class="listings-slider" :class="{ empty: !pages.length }">
-          <div class="track" :style="listingsTrackStyle">
+        <div v-else-if="!error" class="listings-slider" :class="{ empty: !pages.length }">
+          <div class="track" >
             <div
               class="page"
               v-for="(page, p) in pages"
+              v-show="p === pageIndex"
+              :inert="p !== pageIndex"
+              :style="{ flexBasis: '100%' }"
               :key="'pg-' + p"
               role="group"
               :aria-label="`Listings page ${p + 1}`"
@@ -104,7 +110,7 @@
                 <article
                   class="card"
                   v-for="c in page"
-                  :key="c.id ?? `row-${Math.random()}`"
+                  :key="c.id"
                 >
                   <div class="thumb" :style="thumbStyle(c.photoUrl)">
                     <span v-if="!c.photoUrl" class="thumb-ph">No photo</span>
@@ -148,7 +154,7 @@
           </div>
 
           <div v-if="!listings.length" class="empty">
-            No featured users yet.
+            Your next roommate could be here. Create a profile to help the community grow.
           </div>
         </div>
       </div>
@@ -221,7 +227,7 @@ function goDashboard() {
 }
 
 /* ---------- featured listings ---------- */
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
+const API_BASE = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE || "");
 const listings = reactive([]);
 const loading = ref(false);
 const error = ref("");
@@ -242,10 +248,11 @@ async function fetchFeatured() {
   error.value = "";
   listings.splice(0);
   try {
+    pageIndex.value = 0;
     // pull enough to fill multiple pages
     const { data } = await api.get("/room-finder/public?size=60");
     const rows = Array.isArray(data) ? data : data?.content || [];
-    rows.forEach((r) => {
+    rows.filter((r) => r.id != null).forEach((r) => {
       listings.push({
         id: r.id,
         name: r.name,
@@ -289,12 +296,7 @@ function goPage(i) {
   pageIndex.value = i;
 }
 
-const listingsTrackStyle = computed(() => ({
-  width: pageCount.value ? `${pageCount.value * 100}%` : "100%",
-  transform: `translateX(-${
-    pageIndex.value * (100 / (pageCount.value || 1))
-  }%)`,
-}));
+
 
 /* ---------- lifecycle ---------- */
 onMounted(() => {
@@ -335,10 +337,15 @@ function prev() {
 function go(i) {
   index.value = i;
 }
-const autoplay = true;
+const autoplay = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const manuallyPaused = ref(false);
+function togglePlayback() {
+  manuallyPaused.value = !manuallyPaused.value;
+  manuallyPaused.value ? stop() : start();
+}
 function start() {
   stop();
-  if (!autoplay || images.value.length <= 1) return;
+  if (!autoplay || manuallyPaused.value || document.hidden || images.value.length <= 1) return;
   timer = window.setInterval(next, intervalMs);
 }
 function stop() {
@@ -371,15 +378,19 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.eyebrow { color: #3e6c50; font-size: .72rem; font-weight: 800; letter-spacing: .15em; margin-bottom: 1.1rem; }
+.playback { position: absolute; right: 12px; top: 12px; border: 0; border-radius: 20px; padding: .5rem .75rem; background: #fff; color: #17462d; font: inherit; font-size: .75rem; cursor: pointer; }
+.cta-row { flex-wrap: wrap; }
+@media (prefers-reduced-motion: reduce) { .slides, .track { transition: none; } .skeleton { animation: none; } }
 /* ===== HERO (unchanged styles) ===== */
 .hero {
-  background: #f2fff3;
+  background: radial-gradient(ellipse at top left, #dbf2e2, transparent 65%), #f6faf5;
   border-bottom: 1px solid #edf5ef;
 }
 .hero-inner {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2.2rem 1rem 2.8rem;
+  padding: clamp(2.5rem, 7vw, 6rem) 1.5rem;
   display: grid;
   grid-template-columns: 1.2fr 1fr;
   gap: 2rem;
@@ -387,7 +398,9 @@ onBeforeUnmount(() => {
 }
 .copy h1 {
   margin: 0 0 0.6rem;
-  font-size: clamp(2rem, 4.8vw, 3.1rem);
+  font-size: clamp(2.5rem, 4.8vw, 4rem);
+  line-height: 1.08;
+  letter-spacing: -.045em;
   color: #075a2a;
 }
 .tagline {
@@ -514,6 +527,8 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
 }
 .page-indicator {
+  white-space: nowrap;
+  flex-shrink: 0;
   color: #0c4a23;
   font-weight: 700;
 }
@@ -537,7 +552,9 @@ onBeforeUnmount(() => {
 
 /* each page fills the viewport width */
 .page {
-  min-width: 100%;
+  min-width: 0;
+  flex-grow: 0;
+  flex-shrink: 0;
   padding: 2px 0; /* small breathing room between pages */
 }
 

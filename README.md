@@ -1,58 +1,41 @@
-# 🏠 Roommate Finder App
+# StayBuddies frontend
 
-A full-stack roommate matching platform built with **Spring Boot** (Java) for the backend and **Vue.js** for the frontend. The system allows students to register,
-log in, complete lifestyle quizzes, and find compatible roommates based on behavior and preferences.
+Vue 3 application for student profiles, lifestyle matching, messaging, and
+administration. Use Node.js 24.12 or newer.
 
----
+```sh
+npm ci
+cp .env.example .env.local
+npm run dev
+```
 
-## 📌 Features
+Open <http://127.0.0.1:5173>. The backend runs on port 8080; see its README
+for the disposable local preview or persistent PostgreSQL setup. OCR runs on
+port 8000 and is called by the backend.
 
-### ✅ General
-- Responsive Vue.js frontend and Spring Boot backend
-- RESTful API architecture with secure endpoints
-- Clean modular structure for scalability
+`VITE_API_BASE` is the backend origin, without `/api/v1`. During development,
+Vite proxies `/api`, `/uploads`, `/files`, and `/ws`. Application routes such
+as `/login` and `/register` remain Vue pages and support direct navigation.
+For production, configure SPA history fallback and reverse-proxy WebSocket
+upgrades on the web server. Vite preview is a local build check.
 
-### 👤 User Functionality
-- Student signup & login
-- JWT-based authentication for frontend
-- Lifestyle quiz for roommate compatibility
-- Match recommendation system
-- Profile creation and editing
-- Image upload with AWS S3
+Never put secrets in `VITE_*` values: they are included in public browser code.
+Optional push messaging uses the `VITE_FIREBASE_*` public project settings and
+VAPID public key consumed by `src/push.ts`.
 
-### 🔐 Admin Functionality
-- Admin login (Thymeleaf UI)
-- Role-based access control (Spring Security)
-- User management: view, edit, delete students
-- Match overview and approvals (optional)
+```sh
+npm test
+npm run build
+npm audit
+npm run preview
+```
 
----
+Session tests cover token normalization, student/admin separation, expired
+sessions in both browser stores, incorrect login, late 401 responses, and safe
+internal redirects. Login/public requests omit stale credentials. Admin account
+creation requires an existing administrator and preserves their session.
 
-## 🛠️ Tech Stack
-
-| Layer       | Technology                         |
-|------------|-------------------------------------|
-| Frontend   | Vue.js, Vue Router, Axios, Bootstrap/Tailwind |
-| Backend    | Spring Boot, Spring Security, JWT   |
-| Database   | PostgreSQL                          |
-| File Upload| AWS S3 Bucket                       |
-| Build Tool | Maven                               |
-| Auth       | Spring Security (JWT & Session-based) |
-| UI (Admin) | Thymeleaf                           |
-
----
-
-## 🗂️ Project Structure
-
-### Backend (`/backend`)
-- `controller/` — REST APIs
-- `service/` — business logic
-- `repository/` — JPA repositories
-- `model/` — JPA entities
-- `config/` — security & CORS config
-
-### Frontend (`/frontend`)
-- `src/views/` — Login, Quiz, Match List, Profile
-- `src/components/` — UI components
-- `src/router/` — Vue Router setup
-- `src/services/` — API communication with backend
+The homepage includes retryable listing failures, accessible pagination,
+reduced-motion support, and a controllable slideshow. Page routes load lazily.
+Desktop and 375px mobile browser checks were performed with synthetic listings;
+backend/cloud integration and broader accessibility review remain separate work.

@@ -207,4 +207,12 @@ onBeforeUnmount(() => {
     font-size: 1.35rem;
   }
 }
+@media (max-width: 540px) {
+  .rm-wrap { display: flex; gap: .5rem; padding: .75rem 1rem; }
+  .rm-left { flex: 1; min-width: 0; gap: .35rem; }
+  .rm-logo { width: 30px; height: 30px; }
+  .rm-brand { font-size: 1rem; white-space: nowrap; }
+  .rm-right { flex-shrink: 0; gap: .4rem; }
+  .rm-btn { padding: .55rem .65rem; font-size: .82rem; white-space: nowrap; }
+}
 </style>

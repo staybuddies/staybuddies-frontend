@@ -1,71 +1,50 @@
 import axios from "axios";
+import { clearSession, readToken } from "../auth/session.js";
 
-const DEV = import.meta.env.DEV;
-const API_HOST = DEV ? "" : (import.meta.env.VITE_API_BASE || "");
-const BASE = `${String(API_HOST).replace(/\/+$/, "")}/api/v1`;
-
-function readToken() {
-  let t = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
-  t = (t || "").trim();
-  return t ? (t.startsWith("Bearer ") ? t.slice(7) : t) : null;
-}
-
-function readAdminToken() {
-  let t = localStorage.getItem("adminToken") || "";
-  t = (t || "").trim();
-  return t ? (t.startsWith("Bearer ") ? t.slice(7) : t) : null;
-}
-
+const env = import.meta.env || {};
+const host = env.DEV ? "" : (env.VITE_API_BASE || "");
 const api = axios.create({
-  baseURL: BASE,
+  baseURL: `${String(host).replace(/\/+$/, "")}/api/v1`,
   withCredentials: false,
   timeout: 120000,
 });
 
+export function isAdminEndpoint(url = "") {
+  return /^(?:\/api\/v1)?\/admin(?:\/|$)/.test(url);
+}
+
+function isPublicEndpoint(config) {
+  const path = (config.url || "").split("?")[0];
+  const method = (config.method || "get").toLowerCase();
+  return path === "/authenticate" || path === "/admin/login"
+    || (method === "post" && path === "/room-finder")
+    || path.startsWith("/verify-email/")
+    || (method === "get" && /^\/room-finder\/(?:public(?:\/|$)|\d+\/public(?:\/|$))/.test(path));
+}
+
 api.interceptors.request.use((config) => {
-  const isAdminEndpoint = config.url?.includes("/admin");
-  
-  let token;
-  if (isAdminEndpoint) {
-    token = readAdminToken();
-  } else {
-    token = readToken();
+  const admin = isAdminEndpoint(config.url);
+  const token = readToken(admin);
+  if (config.sbForceAuth !== false && !isPublicEndpoint(config) && token
+      && !config.headers.has("Authorization")) {
+    config.headers.set("Authorization", `Bearer ${token}`);
+    config.sbSentToken = token;
+    config.sbAdmin = admin;
   }
-  
-  const wantAuth = config.sbForceAuth !== false;
-  if (wantAuth && token && !config.headers?.Authorization) {
-    config.headers = { 
-      ...(config.headers || {}), 
-      Authorization: `Bearer ${token}` 
-    };
-  }
-  
-  if ("sbForceAuth" in config) delete config.sbForceAuth;
   return config;
 });
 
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      const isAdminEndpoint = error.config?.url?.includes("/admin");
-      
-      if (isAdminEndpoint) {
-        localStorage.removeItem("adminToken");
-        localStorage.removeItem("adminUser");
-        if (window.location.pathname.startsWith("/admin")) {
-          window.location.href = "/admin/login";
-        }
-      } else {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        if (!window.location.pathname.startsWith("/admin")) {
-          window.location.href = "/login";
-        }
-      }
+api.interceptors.response.use((response) => response, (error) => {
+  const config = error.config;
+  if (error.response?.status === 401 && config?.sbSentToken
+      && config.sbSentToken === readToken(config.sbAdmin)) {
+    clearSession(config.sbAdmin);
+    const onAdminPage = window.location.pathname.startsWith("/admin");
+    if (config.sbAdmin === onAdminPage) {
+      window.location.assign(config.sbAdmin ? "/admin/login" : "/login");
     }
-    return Promise.reject(error);
   }
-);
+  return Promise.reject(error);
+});
 
 export default api;

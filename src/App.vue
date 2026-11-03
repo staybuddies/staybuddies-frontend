@@ -1,6 +1,7 @@
 <template>
   <div>
-    <router-view />
+    <a class="skip-link" href="#page-content">Skip to content</a>
+    <div id="page-content" tabindex="-1"><router-view /></div>
     <Footer />
   </div>
 </template>

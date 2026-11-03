@@ -1,10 +1,11 @@
 <template>
   <section class="auth-page">
     <div class="auth-card">
+      <router-link class="back-home" to="/">← StayBuddies</router-link>
       <h2>Welcome back</h2>
-      <p>Enter your details to get started finding your perfect roommate</p>
+      <p>A space of your own. People you feel at home with.</p>
 
-      <form @submit.prevent="onSubmit" novalidate>
+      <form @submit.prevent="onSubmit" :aria-busy="loading">
         <label for="email">Email</label>
         <input
           id="email"
@@ -13,24 +14,30 @@
           placeholder="Enter your email"
           required
           autocomplete="email"
+          :disabled="loading"
         />
 
         <label for="password">Password</label>
         <input
           id="password"
-          type="password"
+          :type="showPassword ? 'text' : 'password'"
           v-model="password"
           placeholder="Enter your password"
           required
           autocomplete="current-password"
+          :disabled="loading"
         />
 
+        <button type="button" class="password-toggle" :aria-pressed="showPassword" @click="showPassword = !showPassword">
+          {{ showPassword ? "Hide password" : "Show password" }}
+        </button>
+
         <button class="primary-btn" type="submit" :disabled="loading">
-          <span v-if="!loading">Get Started</span>
+          <span v-if="!loading">Sign in</span>
           <span v-else>Signing in…</span>
         </button>
 
-        <p v-if="error" class="error">{{ error }}</p>
+        <p v-if="error" class="error" role="alert">{{ error }}</p>
 
         <p class="footer-link">
           Don't have an account?
@@ -45,6 +52,7 @@
 import { ref } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import api from "@/api";
+import { safeRedirect } from "@/auth/session.js";
 
 const router = useRouter();
 const route = useRoute();
@@ -52,9 +60,11 @@ const route = useRoute();
 const email = ref("");
 const password = ref("");
 const loading = ref(false);
+const showPassword = ref(false);
 const error = ref("");
 
 async function onSubmit() {
+  if (loading.value) return;
   error.value = "";
   loading.value = true;
   try {
@@ -67,15 +77,20 @@ async function onSubmit() {
     const token = data.token ?? data.jwt;
     if (!token) throw new Error("No token returned");
 
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("user");
     localStorage.setItem("token", token);
+    window.dispatchEvent(new Event("sb-auth-changed"));
 
     // go to intended page or profile
     router.push(
-      (route.query.redirect && route.query.redirect.toString()) || "/"
+      safeRedirect(route.query.redirect)
     );
   } catch (e) {
     console.error(e);
-    error.value = "Login failed. Check your email/password.";
+    error.value = !e.response
+      ? "We could not reach StayBuddies. Please try again."
+      : "Login failed. Check your email and password.";
   } finally {
     loading.value = false;
   }
@@ -83,8 +98,10 @@ async function onSubmit() {
 </script>
 
 <style scoped>
+.back-home { display: inline-block; color: #0c6336; font-weight: 700; margin-bottom: 1.5rem; }
+.password-toggle { display: block; margin: .6rem 0 0 auto; border: 0; background: transparent; color: #17633c; cursor: pointer; padding: .3rem 0; font: inherit; font-size: .85rem; }
 .auth-page {
-  background-color: #faffd6;
+  background: radial-gradient(ellipse at top left, #dff4e8, transparent 60%), #f7faf7;
   min-height: 100vh;
   display: grid;
   place-items: center;
@@ -94,8 +111,8 @@ async function onSubmit() {
   width: 100%;
   max-width: 420px;
   background: #fff;
-  border: 1px solid #1b9536;
-  border-radius: 10px;
+  border: 1px solid #d6e5db;
+  border-radius: 24px;
   padding: 2rem;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
 }

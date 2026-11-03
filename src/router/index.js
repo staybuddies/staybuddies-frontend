@@ -1,18 +1,19 @@
 // src/router/index.js
 import { createRouter, createWebHistory } from "vue-router";
+import { readToken } from "@/auth/session.js";
 
 // User-facing pages
-import Home from "@/pages/Home.vue";
-import Login from "@/pages/Login.vue";
-import Register from "@/pages/Register.vue";
-import Dashboard from "@/pages/Dashboard.vue";
-import Matches from "@/pages/Matches.vue";
-import Profile from "@/pages/Profile.vue";
-import Messages from "@/pages/Messages.vue";
-import Quiz from "@/pages/Quiz.vue";
-import Suspended from "@/pages/Suspended.vue";
+const Home = () => import("@/pages/Home.vue");
+const Login = () => import("@/pages/Login.vue");
+const Register = () => import("@/pages/Register.vue");
+const Dashboard = () => import("@/pages/Dashboard.vue");
+const Matches = () => import("@/pages/Matches.vue");
+const Profile = () => import("@/pages/Profile.vue");
+const Messages = () => import("@/pages/Messages.vue");
+const Quiz = () => import("@/pages/Quiz.vue");
+const Suspended = () => import("@/pages/Suspended.vue");
 import MatchCard from "@/components/MatchCard.vue";
-import Notifications from "@/pages/Notifications.vue";
+const Notifications = () => import("@/pages/Notifications.vue");
 
 // Lazy user views
 const QuizEdit = () => import("@/pages/QuizEdit.vue");
@@ -31,7 +32,7 @@ const AdminManagement = () => import("@/pages/admin/AdminManagement.vue"); // тн
 
 // Route guards
 function userGuard(to, from, next) {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const token = readToken();
   if (!token) {
     next({ path: '/login', query: { redirect: to.fullPath } });
   } else {
@@ -143,7 +144,7 @@ const routes = [
     path: '/admin/register',
     name: 'admin-register',
     component: AdminRegister,
-    meta: { public: true },
+    beforeEnter: adminGuard,
   },
 
   // Protected admin routes
@@ -223,7 +224,7 @@ router.beforeEach((to) => {
   //  SKIP ADMIN ROUTES - let adminGuard handle them
   if (to.path.startsWith('/admin')) return true;
   
-  const token = localStorage.getItem("token") || sessionStorage.getItem("token") || null;
+  const token = readToken();
   const isPublic = to.meta?.public === true;
 
   if (!isPublic && !token) {

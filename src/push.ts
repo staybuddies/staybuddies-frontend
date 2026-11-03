@@ -1,12 +1,24 @@
-import { initializeApp } from 'firebase/app';
-import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
+import { initializeApp } from '@firebase/app';
+import { getMessaging, getToken, isSupported, onMessage } from '@firebase/messaging';
 import api from '@/api';
 
 let started = false;
 
 export async function startPushOnce() {
-  if (started) return;
+  const required = [import.meta.env.VITE_FIREBASE_API_KEY, import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID, import.meta.env.VITE_FIREBASE_APP_ID,
+    import.meta.env.VITE_FIREBASE_VAPID_KEY];
+  if (started || required.some(value => !value)) return;
   started = true;
+  try {
+    await startPush();
+  } catch {
+    started = false;
+    console.warn('Push notifications are unavailable.');
+  }
+}
+
+async function startPush() {
 
   if (!(await isSupported())) {
     console.warn('FCM not supported on this browser.');
